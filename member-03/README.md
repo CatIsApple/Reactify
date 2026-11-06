@@ -1,6 +1,6 @@
 # member-03
 
-이 폴더에서 Phase 1과 Phase 2를 모두 구현합니다. 공통 요구사항과 협업 규칙은 [루트 README](../README.md)를 확인합니다.
+이 폴더에서 Phase 1과 Phase 2를 모두 구현합니다. 공통 요구사항은 [MISSION.md](../MISSION.md), 협업 규칙은 [CONTRIBUTING.md](../CONTRIBUTING.md)를 확인합니다.
 
 ## 작업 정보
 
