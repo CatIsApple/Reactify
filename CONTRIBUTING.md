@@ -1,5 +1,7 @@
 # 협업 규칙
 
+브랜치 선택부터 커밋·push·PR·병합 후 동기화까지의 명령과 AI 작업 범위는 [Git 작업 규칙](.claude/rules/git-workflow.md)을 단일 기준으로 사용합니다.
+
 ## 작업 범위
 
 각자 아래 영구 개인 브랜치와 폴더에서 **Phase 1과 Phase 2 전체를 독립적으로 구현**합니다. 모듈별 분업은 하지 않습니다. `main`에는 세 구현을 각각 보관하고, 마지막에 하나를 선택합니다.
@@ -35,47 +37,3 @@
 ## 최종 구현 선택
 
 세 구현을 필수 기능 충족, 테스트·엣지 케이스 검증, DOM 부분 업데이트 동작, 핵심 로직 설명 가능 여부, 화면 사용성으로 비교하여 최종 구현 하나를 합의해 선택합니다. 선택한 폴더와 이유를 기록하고 나머지 구현도 유지합니다. **PR 승인 두 명은 변경 검토 조건이며, 최종 구현 선택과 별개입니다.**
-
-## 개인 브랜치에서 작업하기
-
-명령은 저장소 루트에서 실행합니다. 브랜치를 바꾸거나 병합하기 전에 작업 트리를 깨끗하게 정리합니다. 아래는 `member-01` 예시이며, 다른 담당자는 번호를 바꿉니다.
-
-최초 한 번 원격의 개인 브랜치를 가져옵니다. 이미 로컬 브랜치가 있으면 `git switch member-01`을 사용합니다.
-
-```sh
-git fetch origin
-git switch --track origin/member-01
-git merge origin/main
-```
-
-이후 작업을 시작할 때는 다음 순서로 개인 브랜치와 최신 `main`을 반영합니다.
-
-```sh
-git fetch origin
-git switch member-01
-git merge --ff-only origin/member-01
-git merge origin/main
-```
-
-자신의 폴더만 스테이징하고, 실제 변경과 테스트 결과를 확인한 후 커밋합니다.
-
-```sh
-git add member-01/
-git diff --cached
-git commit -m "feat(member-01): implement virtual DOM"
-git push origin member-01
-```
-
-GitHub에서 `member-01` → `main` PR을 만듭니다. 두 명의 최신 승인과 리뷰 대화 해결을 확인한 뒤 **Create a merge commit**으로 병합하며, 개인 브랜치는 삭제하지 않습니다.
-
-병합 후 개인 브랜치에 최신 `main`을 합쳐 다음 작업을 준비합니다.
-
-```sh
-git fetch origin
-git switch member-01
-git merge --ff-only origin/member-01
-git merge origin/main
-git push origin member-01
-```
-
-충돌이 발생하면 내용을 확인하고 관련 팀원과 해결한 뒤 계속합니다. `reset --hard`나 강제 push로 이력을 맞추지 않습니다.
