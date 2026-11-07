@@ -1,5 +1,6 @@
 ![Reactify 로고](assets/reactify-banner.png)
 
+# Reactify
 Vanilla JavaScript로 Virtual DOM → Diff → Patch부터 함수형 컴포넌트·State·Hooks까지 직접 구현하는 UI 라이브러리 프로젝트입니다.
 
 HTML · CSS · JavaScript
