@@ -1,12 +1,12 @@
-# Mini React 팀 작업 안내
+# Reactify 팀 작업 안내
 
 세 명이 각자의 폴더와 영구 개인 브랜치에서 Phase 1(Virtual DOM · Diff · Patch)과 Phase 2(Component · State · Hooks) 전체를 독립적으로 구현합니다. 마지막에는 세 구현 중 하나를 선택합니다. 모듈별 분업이나 서로의 내부 코드 통합을 전제로 작업하지 않습니다.
 
-과제 기준은 [MISSION.md](MISSION.md), 브랜치·리뷰 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md)를 따릅니다. 루트 `README.md`는 0바이트로 유지합니다.
+과제 기준은 [MISSION.md](MISSION.md), 팀 정책은 [CONTRIBUTING.md](CONTRIBUTING.md)를 따릅니다. 브랜치·커밋·push·PR 절차의 단일 기준은 [.claude/rules/git-workflow.md](.claude/rules/git-workflow.md)입니다. 루트 `README.md`는 Reactify 소개 문서이며, 구현 상태를 사실대로 표시합니다.
 
 ## 작업 범위와 구현 규칙
 
-- 작업을 시작하기 전에 `member-01`, `member-02`, `member-03` 중 대상을 명시적으로 확인합니다. 사용자 요청이나 이미 확정된 작업 맥락에 대상이 없으면 먼저 묻습니다. `git status`나 현재 브랜치만으로 담당자를 추측하지 않습니다.
+- 개인 작업은 사용자 요청이나 이미 확정된 작업 맥락의 `member-01`, `member-02`, `member-03`을 따릅니다. 대상이 없으면 먼저 묻고, `git status`나 현재 브랜치만으로 담당자를 추측하지 않습니다. 명시적으로 요청된 공용 문서·설정 작업은 `shared` 범위로 진행하며 개인 번호를 다시 묻지 않습니다.
 - 코드·테스트·설정 변경과 테스트 실행은 해당 개인 폴더로 한정합니다. 다른 팀원의 파일을 덮어쓰지 않습니다. 공용 문서·설정 변경은 별도로 논의된 범위에서 수행합니다.
 - 기본 하네스는 HTML, CSS, JavaScript ES Modules와 Node.js 22 이상을 사용합니다. TypeScript도 과제에서 허용하며, 도입하는 개인의 폴더 안에 도구와 사용법을 기록합니다. React, Vue 등 외부 UI 프레임워크는 사용하지 않습니다.
 - 현재 개발 의존성은 테스트용 `jsdom`뿐이며, 다른 패키지를 추가하기 전에 사람에게 확인합니다. 개인 패키지와 lock 파일을 함께 관리합니다.
@@ -18,6 +18,7 @@
 
 ```text
 CLAUDE.md                       공용 작업 안내
+.claude/rules/git-workflow.md   공용 Git 작업 규칙
 .claude/skills/verify/SKILL.md   공용 검증 절차
 member-01/                      member-02, member-03도 동일한 시작 구조
   package.json / package-lock.json

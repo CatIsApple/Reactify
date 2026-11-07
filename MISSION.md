@@ -1,4 +1,4 @@
-# Mini React 팀 미션
+# Reactify 팀 미션
 
 세 명이 하나의 저장소에서 각자의 Mini React를 구현합니다. 각자 자신의 폴더와 영구 개인 브랜치에서 **Phase 1과 Phase 2의 전체 기능을 독립적으로 구현**합니다. 모듈별로 역할을 나누지 않으며, 최종적으로 세 구현 중 하나를 선택합니다.
 
@@ -14,8 +14,10 @@
 ## 폴더 구조
 
 ```text
-mini-react-team/
-├── README.md          # 의도적으로 비워 둔 파일
+Reactify/
+├── README.md          # 프로젝트 소개
+├── assets/
+│   └── reactify-banner.png
 ├── MISSION.md         # 과제 요구사항
 ├── CONTRIBUTING.md    # 협업 규칙
 ├── CLAUDE.md          # 공용 AI 작업 안내
@@ -49,7 +51,7 @@ mini-react-team/
 | `member-02/` | 작성 예정 | 작성 예정 | JS 또는 TS 선택 예정 |
 | `member-03/` | 작성 예정 | 작성 예정 | JS 또는 TS 선택 예정 |
 
-협업 절차와 리뷰 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md)를 확인합니다. 루트 `README.md`는 의도적으로 비워 둡니다.
+협업 절차와 리뷰 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md)를 확인합니다. 루트 [README.md](README.md)에는 Reactify 소개와 현재 개발 상태를 표시합니다.
 
 ## 최종 구현 선택
 
