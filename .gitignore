@@ -23,6 +23,7 @@ pnpm-debug.log*
 # Editor and operating system files
 .idea/
 .vscode/
+/.claude/settings.local.json
 *.swp
 *.swo
 *~

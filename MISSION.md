@@ -6,8 +6,8 @@
 
 ## 현재 상태
 
-- 협업을 시작하기 위한 폴더와 안내 문서만 준비되어 있습니다.
-- 구현 코드, 실행 환경, 테스트 도구는 아직 없습니다.
+- 각 개인 폴더에 Node.js·jsdom 테스트 하네스와 빈 모듈 폴더를 배치했습니다. 공용 AI 안내와 검증 절차는 루트에 있습니다.
+- 과제 구현 코드, 데모 HTML, 단위·기능 테스트 케이스는 아직 없습니다. 테스트 하네스는 이후 작성할 테스트의 실행 기반입니다.
 - 아래 체크리스트는 앞으로 구현·검증할 항목이며, 완료 또는 테스트 통과를 의미하지 않습니다.
 - HTML, CSS, JavaScript 또는 TypeScript를 사용합니다. React, Vue 등 외부 UI 프레임워크는 사용하지 않습니다.
 
@@ -18,25 +18,30 @@ mini-react-team/
 ├── README.md          # 의도적으로 비워 둔 파일
 ├── MISSION.md         # 과제 요구사항
 ├── CONTRIBUTING.md    # 협업 규칙
+├── CLAUDE.md          # 공용 AI 작업 안내
+├── .claude/skills/verify/SKILL.md
 ├── .github/
 │   └── pull_request_template.md
 ├── .gitignore
 ├── .editorconfig
 ├── member-01/
 │   ├── README.md
+│   ├── package.json / package-lock.json
 │   ├── src/
 │   └── tests/
 ├── member-02/
 │   ├── README.md
+│   ├── package.json / package-lock.json
 │   ├── src/
 │   └── tests/
 └── member-03/
     ├── README.md
+    ├── package.json / package-lock.json
     ├── src/
     └── tests/
 ```
 
-`src/`와 `tests/`에는 빈 폴더를 Git에 기록하기 위한 `.gitkeep`만 있습니다. 파일을 추가한 뒤 해당 `.gitkeep`은 삭제해도 됩니다.
+각 개인 `src/`에는 `vdom/`, `diff/`, `patch/`, `history/`, `app/` 빈 폴더가 있습니다. `tests/`에는 `setup.js`와 `helpers.js`가 있으며, 구현에 맞춘 `*.test.js`는 각자 작성합니다. 기본 환경은 Node.js 22 이상과 JavaScript ES Modules입니다. 설치·실행 명령은 개인 README를 따릅니다. 루트에는 공통 package나 구현 코드를 두지 않습니다.
 
 | 작업 폴더 | 담당자 | 페이지 주제 | 기술 선택 |
 | --- | --- | --- | --- |
@@ -95,5 +100,6 @@ mini-react-team/
 - 여러 상태 변경을 모아서 처리하는 batching 구현하기
 - `MutationObserver`로 테스트 영역 변경 여부를 감지하기
 - 이력 타임라인과 수정 전후 비교 화면 추가하기
+- 기본 과제를 완성한 뒤 Fiber 구조나 작업 중단·재개 실험하기(Fiber는 필수 요구사항이 아님)
 
 확장은 필수 기능과 테스트를 완성한 뒤 선택합니다. 구현한 핵심 로직은 각자 코드 흐름과 예시로 설명할 수 있도록 정리합니다.
