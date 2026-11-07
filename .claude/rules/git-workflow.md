@@ -78,7 +78,7 @@ git merge origin/main
 
 ```sh
 git push -u origin member-01
-gh pr list --repo CatIsApple/mini-react-team --head member-01 --base main --state open
+gh pr list --repo CatIsApple/Reactify --head member-01 --base main --state open
 ```
 
 - 같은 head·base의 열린 PR이 있으면 새 PR을 만들지 않고 기존 PR을 갱신합니다. 최종 변경 범위에 맞춰 제목·본문도 수정합니다.
@@ -86,13 +86,13 @@ gh pr list --repo CatIsApple/mini-react-team --head member-01 --base main --stat
 - 아래 `<실제 제목>`, `<본문 파일 경로>`, `<기존 PR 번호>`는 확인한 값으로 바꾸는 자리표시자입니다. 본문 파일을 먼저 작성하고 해당 분기 하나만 실행합니다.
 
 ```sh
-gh pr create --repo CatIsApple/mini-react-team --base main --head member-01 --title "<실제 제목>" --body-file "<본문 파일 경로>"
+gh pr create --repo CatIsApple/Reactify --base main --head member-01 --title "<실제 제목>" --body-file "<본문 파일 경로>"
 ```
 
 기존 PR을 갱신할 때는 다음 명령을 사용합니다.
 
 ```sh
-gh pr edit "<기존 PR 번호>" --repo CatIsApple/mini-react-team --title "<실제 제목>" --body-file "<본문 파일 경로>"
+gh pr edit "<기존 PR 번호>" --repo CatIsApple/Reactify --title "<실제 제목>" --body-file "<본문 파일 경로>"
 ```
 
 `gh`가 없으면 GitHub 웹 UI에서 같은 head·base의 PR 존재 여부를 확인하고 생성·수정합니다. push 권한이나 연결이 없으면 로컬 결과와 남은 단계를 보고하며 업로드 성공을 주장하지 않습니다.

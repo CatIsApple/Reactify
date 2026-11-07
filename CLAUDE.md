@@ -1,8 +1,8 @@
-# Mini React 팀 작업 안내
+# Reactify 팀 작업 안내
 
 세 명이 각자의 폴더와 영구 개인 브랜치에서 Phase 1(Virtual DOM · Diff · Patch)과 Phase 2(Component · State · Hooks) 전체를 독립적으로 구현합니다. 마지막에는 세 구현 중 하나를 선택합니다. 모듈별 분업이나 서로의 내부 코드 통합을 전제로 작업하지 않습니다.
 
-과제 기준은 [MISSION.md](MISSION.md), 팀 정책은 [CONTRIBUTING.md](CONTRIBUTING.md)를 따릅니다. 브랜치·커밋·push·PR 절차의 단일 기준은 [.claude/rules/git-workflow.md](.claude/rules/git-workflow.md)입니다. 루트 `README.md`는 0바이트로 유지합니다.
+과제 기준은 [MISSION.md](MISSION.md), 팀 정책은 [CONTRIBUTING.md](CONTRIBUTING.md)를 따릅니다. 브랜치·커밋·push·PR 절차의 단일 기준은 [.claude/rules/git-workflow.md](.claude/rules/git-workflow.md)입니다. 루트 `README.md`는 Reactify 소개 문서이며, 구현 상태를 사실대로 표시합니다.
 
 ## 작업 범위와 구현 규칙
 

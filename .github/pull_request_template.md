@@ -32,4 +32,4 @@
 - [ ] 코드 변경 후 다시 승인을 받았고 모든 리뷰 대화를 해결했습니다(재변경이 없으면 재승인 항목 해당 없음).
 - [ ] 병합 요청과 승인 조건을 확인했으며 Create a merge commit으로 병합합니다. 영구 개인 브랜치는 유지합니다.
 
-승인 확인 항목은 실제 리뷰 후에만 체크합니다. 현재 비공개 플랜에서는 승인 조건이 자동 강제되지 않으며, 이 체크리스트나 AI 작성 문구가 승인을 대신하지 않습니다. PR 승인은 최종 구현 선택과 별개입니다. [Git 작업 규칙](https://github.com/CatIsApple/mini-react-team/blob/main/.claude/rules/git-workflow.md)과 [팀 정책](https://github.com/CatIsApple/mini-react-team/blob/main/CONTRIBUTING.md)을 따릅니다.
+승인 확인 항목은 실제 리뷰 후에만 체크합니다. 현재 비공개 플랜에서는 승인 조건이 자동 강제되지 않으며, 이 체크리스트나 AI 작성 문구가 승인을 대신하지 않습니다. PR 승인은 최종 구현 선택과 별개입니다. [Git 작업 규칙](https://github.com/CatIsApple/Reactify/blob/main/.claude/rules/git-workflow.md)과 [팀 정책](https://github.com/CatIsApple/Reactify/blob/main/CONTRIBUTING.md)을 따릅니다.
