@@ -29,8 +29,8 @@
 - 영구 개인 브랜치의 PR은 **Create a merge commit** 방식으로 병합합니다. Squash 또는 Rebase 병합은 사용하지 않습니다.
 - 저장소 설정에도 merge commit만 허용하고 Squash·Rebase 병합과 병합 후 브랜치 자동 삭제를 꺼 두었습니다.
 - PR에는 변경 목적과 폴더, 실제 실행한 테스트 명령·결과, 화면 확인 절차와 필요한 스크린샷을 기록합니다. 실행하지 못한 테스트는 이유를 적습니다.
-- `member-02/`, `member-03/`에는 Node.js·jsdom 시작 하네스가 있습니다. `CatIsApple/`는 사용자 요청으로 코어와 빈 앱 파일만 유지하며 테스트·데모는 없습니다. 개인별 구현·검증 현황은 각 README에서 확인하고, 테스트하지 않은 작업을 통과했다고 표시하지 않습니다.
-- 공용 `CLAUDE.md`와 `.claude/skills/verify/SKILL.md`는 작업 절차만 공유합니다. AI 요청에는 `CatIsApple/src/diff`처럼 담당 경로를 명시하고, 테스트 작성·실행도 해당 개인 폴더로 한정합니다.
+- `member-02/`, `member-03/`에는 Node.js·jsdom 시작 하네스가 있습니다. `CatIsApple/`는 사용자 요청으로 최소 Element 생성 함수와 빈 앱 파일만 유지하며 테스트·데모는 없습니다. 개인별 구현·검증 현황은 각 README에서 확인하고, 테스트하지 않은 작업을 통과했다고 표시하지 않습니다.
+- 공용 `CLAUDE.md`와 `.claude/skills/verify/SKILL.md`는 작업 절차만 공유합니다. AI 요청에는 `CatIsApple/src/element`처럼 담당 경로를 명시하고, 테스트 작성·실행도 해당 개인 폴더로 한정합니다.
 
 **현재 자동 강제 여부:** 위 규칙은 팀이 수동으로 확인하는 정책입니다. 현재 비공개 저장소의 플랜에서는 GitHub 브랜치 보호 API가 `403: Upgrade to GitHub Pro or make this repository public`을 반환하여, 필수 승인 2명·오래된 승인 해제·대화 해결 조건을 자동 강제하는 보호 규칙이 적용되지 않았습니다. PR 체크리스트도 이를 강제하지 않습니다. 공개 전환이나 유료 플랜 변경은 하지 않았습니다.
 

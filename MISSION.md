@@ -6,7 +6,7 @@
 
 ## 현재 상태
 
-- `member-02/`, `member-03/`에는 Node.js·jsdom 시작 하네스가 있습니다. `CatIsApple/`는 코어만 유지하며 테스트·데모를 제거했고 `src/app/index.html`은 빈 파일입니다. 공용 AI 안내와 검증 절차는 루트에 있습니다.
+- `member-02/`, `member-03/`에는 Node.js·jsdom 시작 하네스가 있습니다. `CatIsApple/`는 최소 Element 생성 함수만 유지하며 렌더러·State·Hooks·테스트·데모는 없고 `src/app/index.html`은 빈 파일입니다. 공용 AI 안내와 검증 절차는 루트에 있습니다.
 - 시작 하네스에는 과제 구현 코드, 데모 HTML, 단위·기능 테스트 케이스가 없습니다. 개인별 현재 구현·검증 상태는 각 폴더의 README에서 확인합니다.
 - 아래 체크리스트는 앞으로 구현·검증할 항목이며, 완료 또는 테스트 통과를 의미하지 않습니다.
 - HTML, CSS, JavaScript 또는 TypeScript를 사용합니다. React, Vue 등 외부 UI 프레임워크는 사용하지 않습니다.
@@ -30,7 +30,7 @@ Reactify/
 │   ├── README.md
 │   ├── package.json / package-lock.json
 │   └── src/
-│       ├── vdom/ · diff/ · patch/ · history/ · component/ · hooks/
+│       ├── element/index.js   # 최소 Element 생성 함수
 │       └── app/index.html     # 빈 파일
 ├── member-02/
 │   ├── README.md
@@ -44,11 +44,11 @@ Reactify/
     └── tests/
 ```
 
-시작 하네스의 `src/`는 `vdom/`, `diff/`, `patch/`, `history/`, `app/` 빈 폴더이며, `tests/`에는 `setup.js`와 `helpers.js`가 있습니다. 구현에 맞춘 `*.test.js`는 각자 작성합니다. 현재 `CatIsApple/`는 위 코어 전용 구조를 따릅니다. 기본 환경은 Node.js 22 이상과 JavaScript ES Modules이며, 현재 구현 현황은 개인 README를 확인합니다. 루트에는 공통 package나 구현 코드를 두지 않습니다.
+시작 하네스의 `src/`는 `vdom/`, `diff/`, `patch/`, `history/`, `app/` 빈 폴더이며, `tests/`에는 `setup.js`와 `helpers.js`가 있습니다. 구현에 맞춘 `*.test.js`는 각자 작성합니다. 현재 `CatIsApple/`는 위 Element 전용 구조를 따릅니다. 기본 환경은 Node.js 22 이상과 JavaScript ES Modules이며, 현재 구현 현황은 개인 README를 확인합니다. 루트에는 공통 package나 구현 코드를 두지 않습니다.
 
 | 작업 폴더 | 담당자 | 페이지 주제 | 기술 선택 |
 | --- | --- | --- | --- |
-| `CatIsApple/` | 김다온 | 코어만 유지 · 앱 파일 비움 | JavaScript |
+| `CatIsApple/` | 김다온 | Element 생성 · 앱 파일 비움 | JavaScript |
 | `member-02/` | 작성 예정 | 작성 예정 | JS 또는 TS 선택 예정 |
 | `member-03/` | 작성 예정 | 작성 예정 | JS 또는 TS 선택 예정 |
 
