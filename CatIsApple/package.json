@@ -1,0 +1,8 @@
+{
+  "name": "mini-react-member-01",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -5,7 +5,7 @@ Vanilla JavaScript로 Virtual DOM → Diff → Patch부터 함수형 컴포넌�
 
 HTML · CSS · JavaScript
 
-> **개발 중** · 현재는 개발 환경과 검증 도구를 준비한 단계이며, 구현 코드와 데모는 준비 중입니다.
+> **개발 중** · 각자 독립 구현을 진행하며, 현재 구현·검증 상태는 개인 폴더의 README에서 확인합니다.
 
 **구현 목표**
 
