@@ -1,4 +1,4 @@
-function domToVNode(node) {
+export function domToVNode(node) {
     console.log("들어온 node:", node, "nodeType:", node.nodeType);
     if (node.nodeType === Node.TEXT_NODE) {
         return node.textContent.trim() === "" ? null : node.textContent;
@@ -11,13 +11,10 @@ function domToVNode(node) {
     const children = [...node.childNodes].map(domToVNode).filter((c) => c !== null);
     return { type: node.tagName.toLowerCase(), props, children };
 }
-function vnodeToDom(vnode) {
+export function vnodeToDom(vnode) {
     if (typeof vnode === "string") return document.createTextNode(vnode);
     const el = document.createElement(vnode.type);
     for (const [k, v] of Object.entries(vnode.props)) el.setAttribute(k, v);
     for (const c of vnode.children) el.appendChild(vnodeToDom(c));
     return el;
 }
-let DOM = document.getElementById("DOM"); // DOM 객체 가져오기
-let VDOM = domToVNode(DOM); //DOM 을 VNode 로 변환
-console.log(VDOM);
