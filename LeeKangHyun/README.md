@@ -40,3 +40,22 @@ AI 검증을 요청할 때는 저장소 루트 기준 `/verify member-03/src/dif
 - [ ] 입력·클릭에 반응하는 데모와 단위·기능 테스트
 - [ ] 핵심 로직 설명과 실제 React와의 차이 정리
 - 핵심 설계 / 실제 실행한 테스트 결과 / 알려진 제한: 구현 후 작성
+
+## 작업 기록 (시간순)
+
+새 작업을 할 때마다 아래에 날짜·시각과 변경 내용을 이어서 적습니다.
+
+### 2026-11-07 21:45 — domToVNode
+- `src/vdom/vdom_create.js`: 실제 DOM을 VNode(`{ type, props, children }`, 글자는 문자열)로 변환하는 `domToVNode` 작성. 공백만 있는 텍스트와 주석은 제외.
+
+### 2026-11-09 10:52 — vnodeToDom
+- `src/vdom/vdom_create.js`: VNode를 새 실제 DOM 요소로 만드는 `vnodeToDom` 추가. 기존 DOM은 건드리지 않고 diff도 하지 않음.
+
+### 2026-11-09 17:15 — 페이지 뼈대
+- `src/app/index.html`: 실제 영역(`#real-area`), 테스트 영역(`#test-area`, contenteditable), Patch·뒤로가기·앞으로가기 버튼(동작 미연결).
+- `src/app/main.js`: 로드 시 실제 영역을 VNode로 변환해 테스트 영역에 렌더링.
+- `src/vdom/vdom_create.js`: 두 함수를 `export`하고 최상위 실행 코드를 제거(import 가능하게).
+
+### 2026-11-09 17:19 — diff
+- `src/diff/diff.js`: `diff(oldVNode, newVNode)` 추가. DOM 없이 patch 배열 반환(`REPLACE`, `TEXT`, `PROPS`, `CREATE`, `REMOVE`). `REMOVE`는 인덱스 내림차순. key 비교는 하지 않음.
+- `tests/diff.test.js`: Vitest 형식 테스트 8개 작성. Vitest 미설치로 Vitest 실행은 안 함(임시 스크립트로 8개 통과 확인).
