@@ -1,6 +1,7 @@
 import { vnodeToDom } from "../vdom/vdom_create.js";
 import { diff } from "../diff/diff.js";
 import { patch } from "../diff/patch.js";
+import { setCurrentComponent } from "../hooks/use_state.js";
 
 const isVNode = (v) =>
     v !== null && typeof v === "object" && typeof v.type === "string" && typeof v.props === "object" && v.props !== null && Array.isArray(v.children);
@@ -18,7 +19,13 @@ export class FunctionComponent {
 
     render() {
         this.hookIndex = 0;
-        const vnode = this.fn(this.props);
+        const prev = setCurrentComponent(this);
+        let vnode;
+        try {
+            vnode = this.fn(this.props);
+        } finally {
+            setCurrentComponent(prev);
+        }
         if (!isVNode(vnode)) {
             throw new Error(`FunctionComponent: 컴포넌트는 { type, props, children } VNode를 반환해야 합니다 (받은 값: ${JSON.stringify(vnode)})`);
         }
