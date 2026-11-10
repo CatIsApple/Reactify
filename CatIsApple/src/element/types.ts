@@ -11,7 +11,7 @@ export type ElementChild =
 /** HTML 태그 이름 또는 렌더 중 호출할 함수 컴포넌트. 각 함수의 구체적인 props 타입은 createElement에서 검사한다. */
 export type ElementType = string | ((props: never) => ElementChild);
 
-/** createElement가 만든 화면 설명 객체. 같은 부모의 이전 Fiber 중 key와 타입이 맞는 짝을 찾으며, key가 없으면 위치를 사용한다. */
+/** createElement가 만든 화면 설명 객체. key는 같은 부모 아래에서 이전 Fiber와 짝을 찾을 때 사용한다. */
 export interface ReactifyElement<
   Type extends ElementType = ElementType,
   Props extends object = object,

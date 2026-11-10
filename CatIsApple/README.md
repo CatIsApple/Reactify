@@ -1,98 +1,158 @@
-# Reactify
+# Reactify v2
 
-`CatIsApple`의 Mini React는 TypeScript와 ES 모듈로 구현합니다. Node.js 22 이상에서 이 폴더를 기준으로 다음 명령을 실행합니다.
+Reactify는 함수 컴포넌트와 `useState`로 브라우저 화면을 만드는 TypeScript UI 렌더러입니다. `createElement`로 화면을 기술하면 Fiber가 이전 화면과 비교하고, 렌더러가 바뀐 부분을 DOM에 반영합니다. 런타임 의존성은 없습니다.
+
+[빠른 시작](#빠른-시작) · [렌더링 구조](#렌더링-구조) · [API](#api) · [벤치마크](#벤치마크) · [지원 범위](#지원-범위)
+
+## 빠른 시작
+
+Node.js 22 이상에서 저장소의 `CatIsApple/` 디렉터리로 이동해 빌드합니다.
 
 ```sh
 npm ci
-npm run typecheck
 npm run build
 ```
 
-빌드는 `src/`의 TypeScript를 `dist/`에 JavaScript와 타입 선언 파일로 출력합니다.
+같은 디렉터리에 아래 내용을 `quickstart.html`로 저장합니다. 입력창은 브라우저가 관리하고, Reactify는 `<main>` 안의 인사말을 관리합니다.
 
-`createElement(type, config, ...children)`는 화면을 표현하는 `{ type, key, props }` 객체를 만듭니다. 태그 문자열이나 함수 참조를 `type`에 그대로 저장합니다. [구현](src/element/index.ts) · [Element 타입](src/element/types.ts)
+```html
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<title>Reactify 인사말</title>
+<label>이름 <input id="name" value="다온"></label>
+<main id="app"></main>
 
-```ts
-import { createElement } from './dist/element/index.js';
+<script type="module">
+  import { createElement as h, createRoot } from './dist/index.js';
 
-const item = createElement('li', { key: 0 }, '사과');
-const list = createElement('ul', null, item);
-// item.key === '0'
-// list.props.children === item
+  const input = document.querySelector('#name');
+  const root = createRoot(document.querySelector('#app'));
+
+  function Greeting({ name }) {
+    return h('p', null, `안녕하세요, ${name || '친구'}님!`);
+  }
+
+  function renderGreeting() {
+    root.render(h(Greeting, { name: input.value }));
+  }
+
+  input.addEventListener('input', renderGreeting);
+  renderGreeting();
+</script>
+</html>
 ```
 
-- `config`의 열거 가능한 자체 속성을 새 `props`에 얕게 복사하고, 그중 `key`는 최상위로 분리합니다. 생략하거나 `undefined`면 `null`, 명시한 `null`은 문자열 `'null'`입니다.
-- 자식 인자를 생략하면 `config.children`을 보존합니다. 하나를 전달하면 그 값이 우선하므로 `0`, `false`, 명시적 `undefined`도 그대로 들어갑니다. 여러 개면 순서대로 배열에 담습니다.
+`python3 -m http.server 8000`을 실행하고 브라우저에서 `http://localhost:8000/quickstart.html`을 엽니다. 이름을 바꾸면 기존 `<p>`와 텍스트 노드를 유지하면서 인사말이 바뀝니다. `root.render()`는 갱신을 예약하므로 호출 직후에는 이전 DOM이 보일 수 있습니다.
 
-학습용 객체이며 실제 React 패키지와 호환되는 구현은 아닙니다.
-`src/app/index.html`은 비워 둔 앱 시작점입니다.
+## 렌더링 구조
 
-## Fiber 트리
+![화면 요청은 HostRoot 큐로, 상태 요청은 Hook 큐로 들어갑니다. 루트 스케줄러가 lane을 고르고, Fiber가 변경을 계산합니다. DOM 커밋에 성공하면 root.current가 완성된 트리를 가리킵니다.](assets/fiber-render-flow.png)
 
-`createFiberFromElement(element, parent?)`는 해당 위치의 Fiber 하나를 만들고, `buildFiberTree(element)`는 루트부터 `child`(첫 자식), `sibling`(다음 형제), `return`(부모)을 연결합니다. 두 위치에서 같은 Element를 사용하면 각각의 Fiber가 같은 Element를 참조합니다. [작업 루프](src/fiber/workLoop.ts) · [Fiber 타입](src/fiber/types.ts)
+| 단계 | Reactify가 하는 일 |
+| --- | --- |
+| Element | `createElement(type, props, ...children)`가 `{ type, key, props }`를 만듭니다. 이때는 함수 컴포넌트를 호출하거나 DOM을 생성하지 않습니다. |
+| Render | `root.current`는 화면에 반영된 트리를 가리킵니다. 렌더는 작업용 Fiber를 `child → sibling → return` 링크로 순회합니다. 재사용하는 Fiber는 `alternate`로 이전 버전과 연결되며 기존 DOM 노드를 공유합니다. |
+| Reconcile | 같은 부모 아래에서 단일 Element는 첫 번째로 key가 일치하는 기존 형제의 type을 확인합니다. 목록은 앞에서부터 비교하다 key가 어긋나면 나머지 형제를 Map으로 찾습니다. 같은 key와 type을 유지한 항목은 위치가 바뀌어도 상태와 DOM을 재사용할 수 있습니다. |
+| Commit | 새 DOM은 렌더 중 문서 밖에서 준비합니다. 커밋은 `subtreeFlags`로 변경이 있는 가지를 찾아 삽입·이동(`Placement`), 속성·텍스트 갱신(`Update`), 부모가 기록한 삭제(`ChildDeletion`과 `deletions`)를 동기로 적용합니다. 반영에 성공하면 `root.current`를 교체합니다. |
 
-동기 작업 루프는 `workInProgress`로 현재 Fiber를 가리킵니다. `beginWork`는 직계 자식들을 형제로 연결하고 첫 `child`를 돌려줍니다. 자식이 없으면 `completeUnitOfWork`가 다음 `sibling`을 찾을 때까지 `return`을 따라 올라갑니다. 루트까지 완료하면 순회가 끝납니다. [React의 동기 작업 루프](https://github.com/facebook/react/blob/v19.2.0/packages/react-reconciler/src/ReactFiberWorkLoop.js#L2543-L2548)
+<details>
+<summary>같은 &lt;p&gt;를 다시 렌더링할 때 두 Fiber가 가리키는 곳</summary>
 
-```ts
-import { createElement } from './dist/element/index.js';
-import { buildFiberTree } from './dist/fiber/index.js';
+`root.render(h('p', null, 'A'))`가 커밋된 뒤, 같은 자리에 `'B'`를 렌더링하는 중입니다. 두 호스트 Fiber의 `stateNode`는 화면에 있는 동일한 문단을 가리킵니다.
 
-const item = createElement('li', null, '사과');
-const root = buildFiberTree(createElement('ul', null, item, item));
-// root.child와 root.child.sibling은 서로 다른 Fiber이며, 둘의 return은 root입니다.
+```mermaid
+flowchart LR
+    root["root.current"] --> committed["HostRoot A"]
+    committed -->|child| pA["p Fiber A"]
+    work["작업 중인 HostRoot B"] -->|child| pB["p Fiber B"]
+    committed <-->|alternate| work
+    pA <-->|alternate| pB
+    pA -->|stateNode| dom["실제 DOM의 p"]
+    pB -->|stateNode| dom
 ```
 
-호스트 태그의 중첩 배열은 순서대로 펼칩니다. 숫자 `0`과 빈 문자열은 텍스트 Fiber가 되고, `null`·`undefined`·불리언은 건너뜁니다. 자식이 자기 조상을 다시 참조하면 `TypeError`를 던집니다.
+커밋은 문단 안의 기존 텍스트 노드를 `'B'`로 갱신한 뒤 `root.current`가 HostRoot B를 가리키게 합니다.
 
-## 렌더와 커밋
+</details>
 
-`createRoot(container)`가 반환한 루트의 `current`는 커밋된 HostRoot Fiber를 가리킵니다. 각 Fiber의 `alternate`는 반대편 트리에 있는 짝입니다. 처음 생긴 버튼 Fiber의 `alternate`는 `null`이고, 다음 렌더에서 같은 버튼을 재사용하면 짝이 생깁니다. 두 Fiber의 `stateNode`는 같은 DOM 버튼입니다. [루트](src/fiber/root.ts) · [DOM 반영](src/dom/index.ts)
+### Counter 하나를 갱신하면
 
-```ts
-import { createElement } from './dist/element/index.js';
-import { createRoot } from './dist/fiber/index.js';
+`App` 아래에 `Header`와 `Counter`가 있고, `Counter`만 `setCount(n => n + 1)`을 호출했다고 가정합니다.
 
-const container = document.createElement('div');
-const root = createRoot(container);
-function SaveButton({ disabled }: { disabled: boolean }) {
-  return createElement('button', { disabled }, '저장');
-}
+1. setter가 해당 Hook의 큐에 갱신을 넣습니다. `Counter.lanes`에는 자신의 작업이, 조상의 `childLanes`에는 아래로 내려가야 할 경로가 표시됩니다.
+2. 루트에서 순회를 시작합니다. props 참조가 같은 `App`은 함수 호출을 생략하고 자식으로 내려갑니다. `Header`에는 대기 중인 작업이 없어 그 가지를 건너뜁니다. 이 생략이 **bailout**입니다.
+3. `Counter`가 새 상태로 다시 호출됩니다. 표시한 숫자만 달라졌다면 커밋은 기존 텍스트 노드의 값만 바꿉니다.
 
-root.render(createElement(SaveButton, { disabled: false }));
-const before = root.current;
-const dom = container.querySelector('button')!;
+[Hook 큐와 setter](src/fiber/hooks.ts) · [Fiber 작업 루프와 bailout](src/fiber/workLoop.ts) · [DOM 커밋](src/dom/commitWork.ts)
 
-root.prepare(createElement(SaveButton, { disabled: true }));
-// root.current === before, root.finishedWork === before.alternate, dom.disabled === false
-root.commit();
-// root.current.alternate === before, dom === container.firstChild, dom.disabled === true
+### HostRoot의 업데이트 큐와 스케줄링
+
+`root.render(element)`는 다음 화면을 HostRoot 큐에 넣고, `setState(action)`은 함수 Fiber의 Hook 큐에 상태 갱신을 넣습니다. 두 경로는 한 루트 스케줄러를 사용합니다. **lane**은 각 요청의 우선순위를 나타내는 비트입니다. 스케줄러는 대기 요청을 마이크로태스크에 모아 어느 lane을 먼저 처리할지 정합니다.
+
+| 호출 문맥 | 렌더 실행 방식 |
+| --- | --- |
+| 클릭·키 입력 등 이산 이벤트 | Sync lane으로 예약하고 마이크로태스크에서 처리합니다. |
+| 포인터 이동·스크롤, 일반 코드의 갱신 | 연속 입력과 일반 갱신에는 각각 별도 lane을 배정합니다. 둘 다 렌더를 시작하면 양보 없이 마칩니다. |
+| `startTransition(() => root.render(next))` 또는 idle 우선순위 | 미완성 렌더는 Fiber 사이에서 브라우저에 실행권을 돌려줄 수 있습니다. 스케줄러의 기본 시간 예산은 5ms입니다. 같은 작업은 저장한 Fiber부터 이어가며, 더 급한 입력이 들어오면 우선순위를 다시 판단합니다. |
+
+양보는 렌더 작업 단위 사이에서 일어납니다. 실행 중인 컴포넌트 함수 하나가 오래 걸리면 그 함수가 반환할 때까지 기다립니다. [lane 선택](src/fiber/lanes.ts) · [루트 스케줄러](src/fiber/rootScheduler.ts) · [브라우저 작업 예약](src/scheduler/scheduler.ts)
+
+## API
+
+브라우저에서는 빌드된 `dist/index.js`의 ES 모듈을 가져옵니다. [공개 진입점](src/index.ts)
+
+| API | 용도 |
+| --- | --- |
+| `createElement(type, props?, ...children)` | HTML 태그 또는 함수 컴포넌트의 Element를 만듭니다. 형제 목록에는 항목의 고유 ID를 `key`로 전달합니다. |
+| `createRoot(container)` | DOM 컨테이너에 연결된 루트를 만듭니다. `root.render(children)`로 화면을 예약하고, `root.render(null)`로 내용을 비울 수 있습니다. |
+| `useState(initial)` | 함수 컴포넌트 안에서 `[state, setState]`를 반환합니다. 초기화 함수와 이전 상태를 받는 updater를 지원합니다. Hook은 매 렌더에서 같은 순서로 호출합니다. |
+| `startTransition(scope)` | 콜백 안에서 동기로 등록한 갱신에 전환 우선순위를 부여합니다. |
+| `runWithPriority(priority, scope)` | 콜백 안에서 사용할 우선순위를 지정합니다. 예를 들어 `'sync'`는 갱신을 Sync lane에 예약합니다. |
+
+렌더와 커밋을 따로 관찰하려면 `root.prepare(children)`로 동기 렌더를 마친 뒤 `root.finishedWork`를 확인합니다. 이때 컨테이너는 이전 화면을 유지합니다. `root.commit()`을 호출하면 준비한 변경이 보입니다. [루트 구현](src/fiber/root.ts)
+
+## 벤치마크
+
+**목록 전체를 처음 그리는 비용과, 이미 그린 목록에서 한 행의 숫자를 바꾸는 비용**을 측정했습니다. 각 행은 독립적인 `useState`와 고유 key를 가지며, `<li>` 안에 `<span>`과 `<strong>`을 렌더링합니다. 두 번째 측정에서는 마지막 행의 setter만 호출합니다.
+
+![행 수 100개에서 4,000개까지 최초 마운트 중앙값은 0.4ms에서 16.0ms, 마지막 행 상태 갱신 중앙값은 0.1ms에서 0.8ms로 변했습니다.](assets/list-benchmark.png)
+
+| 행 수 | 최초 마운트 중앙값 | 마지막 행 상태 갱신 중앙값 |
+| ---: | ---: | ---: |
+| 100 | 0.4 ms | 0.1 ms |
+| 500 | 1.9 ms | 0.1 ms |
+| 1,000 | 3.4 ms | 0.3 ms |
+| 2,000 | 6.5 ms | 0.4 ms |
+| 4,000 | 16.0 ms | 0.8 ms |
+
+4,000행에서 상태 갱신은 기존 마지막 행의 DOM을 재사용했습니다. 한 행의 텍스트만 바뀌어도 작업이 남은 자식을 찾는 과정에서 형제 Fiber를 순회하므로 목록 크기는 갱신 비용에도 영향을 줄 수 있습니다.
+
+- **환경** — Apple M4, macOS 15.3.2, Chrome 157.0.8103.40 headless, 2026-11-10. 각 크기에서 5회 예열 후 새 루트로 21회 측정했습니다.
+- **구간** — 두 작업 모두 Sync 우선순위로 요청한 시점부터 DOM 커밋 다음 마이크로태스크까지입니다. 매회 타이머 밖에서 행 수, 변경된 값, 기존 `<strong>`의 노드 동일성을 확인했습니다. 브라우저의 레이아웃과 페인트 완료 시간은 측정 범위 밖입니다.
+- **읽는 법** — 그래프의 점은 중앙값, 범위는 가운데 50%의 측정값입니다. 두 패널은 세로축 범위가 다릅니다. 관찰된 타이머 해상도는 약 0.1 ms입니다. [전체 측정값과 환경](benchmarks/list-results.json) · [측정 코드](benchmarks/list.ts)
+
+<details>
+<summary>내 브라우저에서 재현하기</summary>
+
+`CatIsApple/`에서 라이브러리와 측정 코드를 빌드한 뒤 정적 서버를 실행합니다.
+
+```sh
+npm run build
+npx --no-install tsc --ignoreConfig benchmarks/list.ts --target ES2022 --module NodeNext --strict --outDir build
+python3 -m http.server 8000
 ```
 
-이 예제의 Fiber 트리는 `HostRoot → SaveButton → button → 텍스트`입니다. 렌더 중에 `SaveButton(props)`을 호출하고 반환값을 자식 Fiber로 연결합니다. 컴포넌트가 받은 `props.children`도 반환값에 포함할 때 화면에 나타납니다. 함수 Fiber의 `stateNode`는 `null`이고, 반환한 버튼 DOM이 컨테이너의 직계 자식이 됩니다. 함수가 배열을 반환하면 여러 자식이 그 자리에 순서대로 들어가고, `null`이면 그 자리를 비웁니다.
+`http://localhost:8000/benchmarks/`를 열면 실행이 끝난 뒤 측정값이 JSON으로 표시됩니다. 빠른 시작에서 띄운 서버도 그대로 사용할 수 있습니다.
 
-`render(input)`은 `prepare(input)`과 `commit()`을 동기로 실행합니다. 다시 준비하면 이전 요청을 대체합니다. 준비에 실패하면 대기 중인 결과를 비우고 현재 트리와 화면을 유지합니다. `render(null)`은 자식을 제거합니다.
+</details>
 
-위 예제에서 `prepare()` 직후 버튼 Fiber의 `flags`에는 `Update`가 켜집니다. 버튼의 조상인 `SaveButton`과 `HostRoot`에는 `subtreeFlags`로 같은 비트가 전파됩니다. 버튼의 텍스트는 그대로이므로 커밋은 텍스트 Fiber로 내려가지 않습니다. [플래그 정의](src/fiber/flags.ts) · [전파](src/fiber/workLoop.ts)
+## 지원 범위
 
-| 변경 | 렌더가 표시하는 위치 | 커밋 동작 |
-| --- | --- | --- |
-| 삽입 | 새 서브트리 맨 위 Fiber의 `Placement` | 해당 Fiber가 내놓는 DOM 노드를 다음 기존 형제 앞에 순서대로 삽입합니다. |
-| 이동 | 기존 Fiber를 재사용하면서 위치를 옮길 때 `Placement` | 해당 Fiber의 기존 DOM 노드를 새 형제 순서에 맞춰 옮깁니다. |
-| 속성·텍스트 갱신 | 값이 바뀐 호스트 또는 텍스트 Fiber의 `Update` | 기존 DOM 노드에서 바뀐 값만 씁니다. |
-| 삭제 | 부모의 `ChildDeletion`과 `deletions` | 목록에 담긴 이전 자식 Fiber가 내놓던 DOM 노드를 제거합니다. |
+| 영역 | 현재 v2의 동작 |
+| --- | --- |
+| HTML과 자식 | HTML 요소, 문자열, 숫자, 중첩 배열을 렌더링합니다. `null`, `undefined`, 불리언 자식은 생략합니다. |
+| 속성과 이벤트 | `className`, `htmlFor`, `data-*`, `aria-*`, 문자열 `style`을 지원합니다. 이벤트는 빠른 시작처럼 브라우저의 `addEventListener`로 연결합니다. `onClick` 같은 이벤트 props와 객체형 `style`은 전달하면 오류가 발생합니다. |
+| 컴포넌트와 확장 범위 | 함수 컴포넌트마다 `useState`를 사용할 수 있습니다. 현재 공개 Hook은 `useState` 하나입니다. JSX 런타임, `ref`, SVG·MathML 렌더링은 미지원입니다. |
 
-첫 커밋은 HostRoot의 `Snapshot`을 보고 기존 컨테이너를 비웁니다. 각 부모에서는 삭제를 먼저 처리하고, `subtreeFlags`에 변경이 있는 가지로 내려갑니다. 자식 작업을 마치면 해당 Fiber 자신의 삽입·갱신을 적용합니다. DOM 변경이 모두 성공하면 `root.current`를 교체합니다. 중간에 실패하면 이미 적용한 DOM 변경을 역순으로 되돌리고 같은 `finishedWork`로 재시도할 수 있습니다. [DOM 준비](src/dom/completeWork.ts) · [커밋 순회](src/dom/index.ts)
-
-현재 DOM 렌더러는 HTML 요소와 텍스트를 표시합니다. 속성은 문자열·숫자, `className`·`htmlFor`, `disabled` 같은 HTML 불리언 속성, `aria-*`·`data-*`를 처리합니다. 이벤트 핸들러, 객체형 스타일, SVG, Hooks는 이후 레이어의 범위입니다. [속성 처리](src/dom/attributes.ts)
-
-검증은 `npm run typecheck`, `npm run build`와 실제 Chrome에서 수행했습니다. 자식 텍스트와 부모 속성을 함께 바꿨을 때 부모의 속성 변경 콜백은 새 텍스트와 교체 전 `current`를 읽었습니다. 텍스트 하나만 바꿨을 때 변경 없는 형제의 자식 링크 접근은 0회였고, 동일 입력에서는 DOM 변경도 0건이었습니다. 함수 컴포넌트가 여러 노드를 반환할 때의 삽입 순서와 입력 포커스, 18,001단계 트리의 갱신·삭제, DOM 쓰기 직후 예외를 던진 뒤 원래 노드 복구와 재시도도 확인했습니다.
-
-React DOM 19.2와 Reactify에 같은 함수 컴포넌트 트리를 렌더해 반환하는 자식 수를 바꾸는 8번의 갱신에서 HTML과 입력 노드 재사용이 일치하는지 확인했습니다. 함수의 예외·순환 반환·지원하지 않는 Promise나 일반 객체 반환은 준비 단계에서 실패하고, 이후 정상 입력으로 다시 렌더할 수 있습니다.
-
-## key로 형제 재정렬하기
-
-같은 부모의 자식을 앞에서부터 비교합니다. 처음으로 key가 어긋나면 **남은 이전 형제만** Map에 넣습니다. 명시한 key는 문자열, key 없는 자식은 `null`·`undefined`·불리언을 제외한 숫자 위치로 찾습니다. 따라서 `key={0}`과 key 없는 첫 번째 자식은 서로 다른 후보입니다. 후보의 타입까지 같으면 Fiber의 짝과 DOM을 재사용합니다. 타입이나 부모가 바뀌면 새로 만듭니다. 같은 부모에서 key가 중복되면 모두 표시하지만, 어느 기존 노드를 재사용할지는 보장하지 않습니다. [자식 조정](src/fiber/workLoop.ts)
-
-예를 들어 `[A, B, C] → [B, A, C]`에서 새 순서로 읽은 이전 위치는 `[1, 0, 2]`입니다. B의 이전 위치 1을 기록한 뒤 A의 0을 만나므로 A에만 `Placement`를 붙입니다. 커밋은 기존 A를 C 앞에 옮깁니다. 세 DOM 객체는 그대로이고 삭제 목록은 비어 있습니다. [React의 placeChild](https://github.com/facebook/react/blob/v19.2.0/packages/react-reconciler/src/ReactChildFiber.js#L458-L485)
-
-Chrome에서 중첩 함수 컴포넌트 목록을 600회 갱신해 React DOM 19.2.0과 최종 HTML 및 각 DOM 노드의 재사용 여부가 일치하는지 확인했습니다. 별도 이동 검증에서는 사용자가 입력한 값·포커스·역방향 선택 범위가 유지됐고, 이동 직후 예외가 발생해도 커밋 전 순서로 복구된 뒤 재시도에 성공했습니다.
+이 문서는 `Element → Fiber → DOM` 방식의 v2를 다룹니다. 팀 과제의 DOM 변환 및 상태 이력 요구사항은 공용 미션에서 확인할 수 있습니다. [팀 프로젝트](../README.md) · [프로젝트 미션](../MISSION.md) · [협업 가이드](../CONTRIBUTING.md)

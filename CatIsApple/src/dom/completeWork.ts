@@ -22,8 +22,13 @@ function* changedAttributes(
 
 /** 새 요소는 문서 밖에서 조립하고, 기존 요소는 최종 HTML 속성이 달라졌을 때 Update를 표시한다. */
 function completeElement(fiber: HostElementFiber, doc: Document): void {
-  const { type } = fiber.element;
-  if (typeof type !== 'string') throw new TypeError('DOM rendering requires an HTML element');
+  const current = fiber.alternate;
+  if (current !== null && current.memoizedProps === fiber.pendingProps) {
+    // bailout한 작업도 다음 렌더의 비교 기준이 되므로 이전 속성 스냅샷을 그대로 물려받는다.
+    attributesByFiber.set(fiber, attributesByFiber.get(current)!);
+    return;
+  }
+  const { type } = fiber;
   const tag = type.toLowerCase();
   if (tag === 'svg' || tag === 'math' || tag === 'template') throw new TypeError(`Unsupported HTML host: ${tag}`);
   if (fiber.child && voidTags.has(tag)) throw new TypeError(`HTML element ${tag} cannot have children`);
