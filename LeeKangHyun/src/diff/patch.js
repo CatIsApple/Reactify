@@ -1,10 +1,10 @@
 import { vnodeToDom } from "../vdom/vdom_create.js";
 
-function find(root, path) {
+function find(root, path) { //어딜 바꿔야하는지 찾아주는 함수
     let node = root;
     for (const i of path) {
         node = node.childNodes[i];
-        if (!node) throw new Error(`patch: path [${path}] 에 해당하는 노드가 없습니다`);
+        if (!node) throw new Error(`patch: path [${path}] 에 해당하는 노드가 없습니다`); //만약 path가 잘못되었다면 에러를 던진다.
     }
     return node;
 }
@@ -20,16 +20,16 @@ export function patch(rootDom, patches) {
             continue;
         }
         const node = find(root, p.path);
-        if (p.op === "REPLACE") {
+        if (p.op === "REPLACE") { //태그 바꾸기
             const next = vnodeToDom(p.vnode);
             node.replaceWith(next);
             if (node === root) root = next;
-        } else if (p.op === "TEXT") {
+        } else if (p.op === "TEXT") { //텍스트 바꾸기
             node.textContent = p.text;
-        } else if (p.op === "PROPS") {
+        } else if (p.op === "PROPS") { //속성 바꾸기
             for (const [k, v] of Object.entries(p.set)) node.setAttribute(k, v);
             for (const k of p.remove) node.removeAttribute(k);
-        } else if (p.op === "REMOVE") {
+        } else if (p.op === "REMOVE") { //지우기
             node.remove();
         } else {
             throw new Error(`patch: 알 수 없는 op ${p.op}`);
