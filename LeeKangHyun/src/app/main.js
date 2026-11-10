@@ -8,6 +8,7 @@ const testArea = document.getElementById("test-area");
 const patchBtn = document.getElementById("patch-btn");
 const backBtn = document.getElementById("back-btn");
 const forwardBtn = document.getElementById("forward-btn");
+const historyPos = document.getElementById("history-pos"); //페이지 VDOM 순서 코드
 
 // 바깥 래퍼에 id를 붙이면 테스트 영역으로 복사될 때 중복되므로 firstElementChild를 읽는다
 let oldVDOM = domToVNode(realArea.firstElementChild);
@@ -18,9 +19,10 @@ console.log(oldVDOM);
 
 const history = createHistory(oldVDOM);
 
-function updateButtons() {
+function updateButtons() { //history 상태에 따라 뒤로가기 앞으로가기 버튼
     backBtn.disabled = !history.canBack();
     forwardBtn.disabled = !history.canForward();
+    historyPos.textContent = `${history.position()}/${history.size()}`; //페이지 VDOM 순서 코드
 }
 updateButtons();
 

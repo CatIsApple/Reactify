@@ -13,6 +13,8 @@ export function createHistory(initial) { //초기 상태
         current: () => states[index],//지금 위치의 상태를 반환
         canBack: () => index > 0, //뒤로갈수있나 참/거짓
         canForward: () => index < states.length - 1, //앞으로 갈수있나 참/거짓
+        position: () => index + 1, //페이지 VDOM 순서 코드
+        size: () => states.length, //페이지 VDOM 순서 코드
         back: () => move(index - 1), //한칸 뒤로 갈수있나.
         forward: () => move(index + 1), //한칸 앞으로 갈수있나.
         push(vnode) {//새로운 VDOME를 추가. 앞으로가기 기록이 있으면 삭제하고 새로 추가한다.

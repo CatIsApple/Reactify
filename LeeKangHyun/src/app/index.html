@@ -6,14 +6,14 @@
   <title>Mini React - Phase 1</title>
 </head>
 <body>
-  <h1>Mini React</h1>
+  <h1>Mini React <span id="history-pos">1/1</span></h1> <!-- 페이지 VDOM 순서 코드 -->
   <div>
-    <button id="patch-btn" type="button">Patch</button>
+    <button id="patch-btn" type="button">Patch / 적용하기</button>
     <button id="back-btn" type="button">뒤로가기</button>
     <button id="forward-btn" type="button">앞으로가기</button>
   </div>
   <section>
-    <h2>실제 영역</h2>
+    <h2>실제 영역 / DOM</h2>
     <div id="real-area">
       <div>
         <h1 class="title">제목</h1>
@@ -26,7 +26,7 @@
     </div>
   </section>
   <section>
-    <h2>테스트 영역</h2>
+    <h2>테스트 영역 / VDOM</h2>
     <div id="test-area" contenteditable="true"></div>
   </section>
   <script type="module" src="./main.js"></script>
