@@ -3,17 +3,18 @@ import { NoFlags } from './flags.js';
 import { NoLanes, type Lane } from './lanes.js';
 import type { ChildFiber, ElementFiber, Fiber, HostRootFiber, ParentFiber, TextFiber } from './types.js';
 
-// 순환 검사용 표식만 공유한다. 약한 키와 symbol 값은 원본 Element를 붙잡지 않는다.
-const cycleTokens = new WeakMap<ReactifyElement | ElementFiber, symbol>();
+// Element 객체를 처음 만난 순서다. Fiber에는 번호만 남겨 원본 Element의 수명을 늘리지 않는다.
+const elementIds = new WeakMap<ReactifyElement, number>();
+let lastElementId = 0;
 
-/** 같은 Element가 조상 경로에 다시 나타나는지 검사할 때 쓸 표식을 얻는다. */
-export function getCycleToken(source: ReactifyElement | ElementFiber): symbol {
-  let token = cycleTokens.get(source);
-  if (token === undefined) {
-    token = Symbol();
-    cycleTokens.set(source, token);
-  }
-  return token;
+/** 같은 Element를 재사용하면 기존 번호를, 처음 보는 객체에는 이전보다 큰 번호를 준다. */
+function getElementId(element: ReactifyElement): number {
+  const previous = elementIds.get(element);
+  if (previous !== undefined) return previous;
+  if (lastElementId === Number.MAX_SAFE_INTEGER) throw new RangeError('Element identity limit exceeded');
+  const id = ++lastElementId;
+  elementIds.set(element, id);
+  return id;
 }
 
 /** Element에서 type·key·props를 읽어 해당 위치의 Fiber를 만든다. */
@@ -26,16 +27,15 @@ export function createFiberFromElement(
     throw new TypeError('Expected an Element with a tag or component function and props');
   }
   const fields = {
-    key: key ?? null, index: 0, return: parent, child: null, sibling: null,
+    key: key ?? null, elementId: getElementId(element), maxPathId: 0,
+    index: 0, return: parent, child: null, sibling: null,
     alternate: null, stateNode: null, pendingProps: props, memoizedProps: null,
     lanes: NoLanes, childLanes: NoLanes, updateQueue: null,
     flags: NoFlags, subtreeFlags: NoFlags, deletions: null,
   };
-  const fiber: ElementFiber = typeof type === 'string'
+  return typeof type === 'string'
     ? { ...fields, tag: 'element', type }
     : { ...fields, tag: 'function', type, memoizedState: null };
-  cycleTokens.set(fiber, getCycleToken(element));
-  return fiber;
 }
 
 /** 표시할 문자열을 담은 텍스트 Fiber를 만들고 부모를 연결한다. */
@@ -58,7 +58,7 @@ export function reuseElementFiber(current: ElementFiber, parent: ParentFiber, in
   work.pendingProps = props;
   if (work.tag === 'function' && current.tag === 'function') work.memoizedState = current.memoizedState;
   work.child = null;
-  cycleTokens.set(work, getCycleToken(input ?? current));
+  work.elementId = input === undefined ? current.elementId : getElementId(input);
   return work;
 }
 
@@ -76,6 +76,14 @@ export function useAlternate<F extends ChildFiber>(current: F, work: F, parent: 
   if (work.tag !== 'function') work.stateNode = current.stateNode;
   work.memoizedProps = current.memoizedProps;
   return work;
+}
+
+/** 가지의 자식을 먼저 방문하고, 마지막 자손 뒤에는 경계 밖 형제로 넘어가지 않는다. */
+export function nextInSubtree(fiber: ChildFiber, boundary: ChildFiber): ChildFiber | null {
+  if (fiber.child !== null) return fiber.child;
+  let cursor: Fiber = fiber;
+  while (cursor !== boundary && cursor.sibling === null) cursor = cursor.return!;
+  return cursor === boundary ? null : cursor.sibling;
 }
 
 /** 업데이트를 받은 Fiber와 그 짝에 lane을 표시하고, 양쪽 조상의 childLanes를 거쳐 HostRoot를 찾는다. */

@@ -1,6 +1,6 @@
-import { ChildDeletion, MutationMask, NoFlags, Placement, Snapshot, Update } from '../fiber/flags.js';
+import { ChildDeletion, ContentReset, MutationMask, NoFlags, Placement, Snapshot, Update } from '../fiber/flags.js';
 import type { ChildFiber, Fiber, FunctionFiber, HostRootFiber, ParentFiber } from '../fiber/types.js';
-import { commitHostUpdate } from './completeWork.js';
+import { commitHostUpdate, commitTextContent } from './completeWork.js';
 import { captureFocus } from './focus.js';
 import { hostNodes } from './hostNodes.js';
 
@@ -82,11 +82,14 @@ function placeHostNodes(parent: Element, fiber: ChildFiber, anchors: Map<ChildFi
   for (let i = 0; i < end; i++) {
     const node = nodes[i];
     if (node.parentNode === parent && node.nextSibling === anchor) continue;
-    if (node.parentNode !== null) {
-      rememberPosition(node.parentNode, node, undo);
+    const previousParent = node.parentNode;
+    if (previousParent !== null) {
+      rememberPosition(previousParent, node, undo);
     } else {
       // 새 노드는 삽입 뒤 예외가 발생하더라도 실제로 붙었을 때만 떼어낸다.
-      undo.push(() => { if (node.parentNode === parent) parent.removeChild(node); });
+      undo.push(() => {
+        if (node.parentNode === parent) parent.removeChild(node);
+      });
     }
     parent.insertBefore(node, anchor);
   }
@@ -101,6 +104,10 @@ function commitSubtree(root: HostRootFiber, undo: Undo[], visited: Fiber[]): voi
     if (((fiber.flags | fiber.subtreeFlags) & MutationMask) !== NoFlags) {
       visited.push(fiber);
       if (fiber.tag === 'function') functionParents.set(fiber, hostParent(fiber.return, functionParents));
+      if (fiber.tag === 'element' && (fiber.flags & ContentReset) !== NoFlags) {
+        // 새 자식의 Placement가 실행되기 전에 이전 직접 텍스트를 제거한다.
+        commitTextContent(fiber.stateNode!, '', undo);
+      }
       if ((fiber.flags & ChildDeletion) !== NoFlags && fiber.tag !== 'text' && fiber.deletions !== null) {
         const parent = hostParent(fiber, functionParents);
         for (const deleted of fiber.deletions) removeHostNodes(parent, deleted, undo);
@@ -159,12 +166,13 @@ function linkReusedChildren(parents: readonly ParentFiber[], usePrevious: boolea
 export function commitMutationEffects(finished: HostRootFiber, reusedParents: readonly ParentFiber[] = []): void {
   const undo: Undo[] = [];
   const visited: Fiber[] = [];
-  const structuralEffects = (finished.flags | finished.subtreeFlags) & (Placement | ChildDeletion | Snapshot);
+  const flags = finished.flags | finished.subtreeFlags;
+  const structuralEffects = flags & (Placement | ChildDeletion | ContentReset | Snapshot);
   const restoreFocus = structuralEffects === NoFlags ? null : captureFocus(finished.stateNode.container);
   try {
     linkReusedChildren(reusedParents, false);
     if ((finished.flags & Snapshot) !== NoFlags) clearContainer(finished.stateNode.container, undo);
-    commitSubtree(finished, undo, visited);
+    if (flags & MutationMask) commitSubtree(finished, undo, visited);
     restoreFocus?.();
   } catch (error) {
     linkReusedChildren(reusedParents, true);

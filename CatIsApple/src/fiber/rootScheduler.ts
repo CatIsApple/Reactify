@@ -1,4 +1,5 @@
 import { scheduleCallback, type SchedulerCallback } from '../scheduler/index.js';
+import { flushPassiveEffects } from './passiveEffects.js';
 import {
   getHighestPriorityLane, getNextLanes, includesBlockingLane, laneTimeout, NoLanes,
   schedulerPriorityForLanes, SyncLane, TransitionLanes, type Lane, type Lanes,
@@ -96,6 +97,15 @@ export class RootScheduler {
 
   /** 새 렌더는 같은 루트 큐의 대기 전환들을 함께 읽고, 양보한 렌더는 같은 lane과 Fiber에서 재개한다. */
   private perform(shouldYield?: () => boolean, didTimeout = false): boolean {
+    // 직전 커밋의 effect가 새 요청을 넣거나 현재 콜백을 취소할 수 있다.
+    const callbackLane = this.callbackLane;
+    flushPassiveEffects();
+    if (this.paused || this.callbackLane !== callbackLane) return true;
+    if (getHighestPriorityLane(getNextLanes(this.pendingLanes, this.renderLanes)) !== callbackLane) {
+      this.cancelWork();
+      this.ensureScheduled();
+      return true;
+    }
     if (!this.slice) {
       this.renderLanes = getNextLanes(this.pendingLanes);
       if ((this.renderLanes & TransitionLanes) !== NoLanes) {

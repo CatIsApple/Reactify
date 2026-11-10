@@ -1,6 +1,6 @@
 import type { ElementChild, ElementType, ReactifyElement } from '../element/types.js';
 import type { Flags } from './flags.js';
-import type { StateHook } from './hooks.js';
+import type { Hook } from './hooks.js';
 import type { Lane, Lanes } from './lanes.js';
 import type { RootUpdateQueue } from './updateQueue.js';
 
@@ -74,6 +74,10 @@ interface ChildLinks extends FiberWork {
 interface ElementFiberFields extends ChildLinks {
   /** 같은 부모 아래에서 형제끼리 짝을 찾을 때 쓰는 key다. */
   readonly key: string | null;
+  /** 이 Fiber에 입력된 Element 객체의 고유 번호. props가 같아도 다른 객체라면 번호가 다르다. */
+  elementId: number;
+  /** 이번 렌더에서 루트부터 자신까지 방문한 Element 번호의 최댓값. */
+  maxPathId: number;
   /** 이번 렌더에서 처리할 props. */
   pendingProps: ReactifyElement['props'];
   /** 이 Fiber가 마지막으로 처리한 props. 아직 한 번도 처리하지 않았으면 null이다. */
@@ -95,8 +99,8 @@ export interface FunctionFiber extends ElementFiberFields {
   readonly tag: 'function';
   /** 비교와 컴포넌트 호출에 직접 사용하는 함수 참조다. */
   readonly type: Exclude<ElementType, string>;
-  /** 이 컴포넌트가 호출 순서대로 연결한 상태 Hook 목록의 첫 노드. */
-  memoizedState: StateHook | null;
+  /** 이 컴포넌트가 호출 순서대로 연결한 state·effect·memo Hook 목록의 첫 노드. */
+  memoizedState: Hook | null;
   alternate: FunctionFiber | null;
   readonly stateNode: null;
 }

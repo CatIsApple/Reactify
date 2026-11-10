@@ -4,6 +4,7 @@ import { NoFlags, Snapshot } from './flags.js';
 import { markUpdateLaneFromFiberToRoot } from './fiberNode.js';
 import { NoLanes, SyncLane, type Lane, type Lanes } from './lanes.js';
 import { RootScheduler } from './rootScheduler.js';
+import { collectPassiveEffects, enqueuePassiveEffects, flushPassiveEffects } from './passiveEffects.js';
 import type { FiberRoot, FiberRootInstance, FunctionFiber, HostRootFiber } from './types.js';
 import {
   createUpdateQueue, discardUpdates, enqueueUpdate, getPendingLanes, processUpdateQueue,
@@ -123,6 +124,7 @@ class ReactifyRoot implements FiberRootInstance {
   /** 수동 커밋 전에는 다른 콜백이 준비한 트리를 덮지 않도록 예약을 보류한다. */
   prepare(children: ElementChild): void {
     this.assertIdle();
+    flushPassiveEffects();
     this.abandonPrepared();
     this.scheduler.pause();
     const id = this.enqueue(children, SyncLane);
@@ -143,10 +145,14 @@ class ReactifyRoot implements FiberRootInstance {
   /** 표시된 DOM 변경이 성공하면 current를 교체하고 커밋 도중 접수된 요청까지 다시 예약한다. */
   commit(): void {
     this.assertIdle();
+    if (this.pending === null) return;
+    flushPassiveEffects();
     const render = this.pending;
     if (render === null) return;
     this.busy = true;
     try {
+      // DOM 커밋이 deletions를 비우기 전에 정리할 Hook을 찾는다. 실패한 트리의 effect는 예약하지 않는다.
+      const passive = collectPassiveEffects(render.tree);
       render.work.withMountingHooks(() => {
         runWithCommitPriority(() => commitMutationEffects(render.tree, render.work.reusedParents));
       });
@@ -158,9 +164,11 @@ class ReactifyRoot implements FiberRootInstance {
       this.pending = null;
       this.discardOnAbandon = [];
       this.finishScheduling(render.tree.lanes);
+      enqueuePassiveEffects(passive, render.lanes);
     } finally {
       this.busy = false;
     }
+    if (render.lanes & SyncLane) flushPassiveEffects();
   }
 
   /** 호출 문맥의 lane으로 새 화면을 예약한다. 렌더나 커밋 도중의 요청은 다음 작업에서 읽는다. */

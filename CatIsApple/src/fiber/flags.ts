@@ -11,5 +11,11 @@ export const Update = 1 << 1;
 export const ChildDeletion = 1 << 2;
 /** HostRoot의 첫 커밋에서 자식을 삽입하기 전에 컨테이너를 비운다. */
 export const Snapshot = 1 << 3;
+/** DOM 커밋 뒤 이 함수 컴포넌트의 useEffect를 정리·실행해야 한다. */
+export const Passive = 1 << 4;
+/** 호스트가 직접 표시하던 텍스트를 새 Fiber 자식이 삽입되기 전에 비운다. */
+export const ContentReset = 1 << 5;
 /** DOM 변경 단계에서 확인하는 플래그의 합집합. */
-export const MutationMask = Placement | Update | ChildDeletion;
+export const MutationMask = Placement | Update | ChildDeletion | ContentReset;
+/** 새 effect 또는 삭제된 가지의 cleanup을 찾을 때 확인하는 플래그다. */
+export const PassiveMask = Passive | ChildDeletion;

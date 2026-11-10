@@ -1,5 +1,5 @@
 import { getEventPriority } from '../dom/index.js';
-import { getHighestPriorityLane, laneForPriority, NoLane, type Lane, type Lanes, type RenderPriority } from './lanes.js';
+import { getHighestPriorityLane, IdleLane, laneForPriority, NoLane, type Lane, type Lanes, type RenderPriority } from './lanes.js';
 
 let inTransition = false;
 let currentPriority: RenderPriority | undefined;
@@ -38,18 +38,28 @@ export function runWithRenderLanes<T>(lanes: Lanes, scope: () => T): T {
   }
 }
 
-/** DOM 커밋 콜백에서 요청하는 갱신은 동기 우선순위로 처리하고, 커밋이 끝나면 호출자의 문맥을 복원한다. */
-export function runWithCommitPriority<T>(scope: () => T): T {
+/** 커밋 콜백은 렌더 lane과 바깥 전환에서 분리해 실행하고 호출자의 문맥을 복원한다. */
+function runCommitCallback<T>(priority: RenderPriority, scope: () => T): T {
   const previousLane = currentRenderLane;
   const previousTransition = inTransition;
   currentRenderLane = NoLane;
   inTransition = false;
   try {
-    return runWithPriority('sync', scope);
+    return runWithPriority(priority, scope);
   } finally {
     currentRenderLane = previousLane;
     inTransition = previousTransition;
   }
+}
+
+/** DOM 커밋 도중 요청한 갱신은 동기 우선순위로 처리한다. */
+export function runWithCommitPriority<T>(scope: () => T): T {
+  return runCommitCallback('sync', scope);
+}
+
+/** effect의 상태 요청에는 기본 우선순위를 주고, 유휴 커밋의 effect만 유휴 우선순위를 유지한다. */
+export function runWithPassivePriority<T>(lanes: Lanes, scope: () => T): T {
+  return runCommitCallback(getHighestPriorityLane(lanes) === IdleLane ? 'idle' : 'normal', scope);
 }
 
 /** 렌더 중인 lane, 전환, 지정한 문맥, 현재 DOM 이벤트 순으로 이번 갱신의 lane을 고른다. */

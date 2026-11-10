@@ -1,11 +1,37 @@
 import type { ElementChild, ReactifyElement } from '../element/types.js';
 import { cloneChildFibers, reconcileChildren } from './childReconciler.js';
-import { createFiberFromElement, getCycleToken } from './fiberNode.js';
+import { createFiberFromElement, nextInSubtree } from './fiberNode.js';
+import { Passive } from './flags.js';
 import { commitHooks as commitFunctionHooks, detachHooks, renderWithHooks, stageMountHooks } from './hooks.js';
 import { NoLanes, type Lanes } from './lanes.js';
 import type { ChildFiber, ElementFiber, Fiber, FunctionFiber, ParentFiber } from './types.js';
 
 export { createFiberFromElement, markUpdateLaneFromFiberToRoot } from './fiberNode.js';
+
+/** 이미 만든 Element를 조상 아래 재배치할 때만, 이 렌더에서 열린 경로를 집합으로 관리한다. */
+interface ElementPath {
+  activeIds: Set<number> | null;
+}
+
+/** 자식의 번호가 모든 조상보다 크면 순환할 수 없다. 그 밖의 경우 실제 조상 번호와 대조한다. */
+function enterElement(fiber: ElementFiber, path: ElementPath): void {
+  const id = fiber.elementId;
+  const parent = fiber.return;
+  const parentMax = parent === null || parent.tag === 'root' ? 0 : parent.maxPathId;
+  if (id > parentMax) {
+    fiber.maxPathId = id;
+  } else {
+    fiber.maxPathId = parentMax;
+    if (path.activeIds === null) {
+      path.activeIds = new Set();
+      for (let ancestor = parent; ancestor !== null && ancestor.tag !== 'root'; ancestor = ancestor.return) {
+        path.activeIds.add(ancestor.elementId);
+      }
+    }
+    if (path.activeIds.has(id)) throw new TypeError('Cycle in Element children');
+  }
+  path.activeIds?.add(id);
+}
 
 /** 부모의 입력이 같으면 자손에 이번 lane의 작업이 있는지 보고 자식들을 복제하거나 이미 커밋한 가지를 공유한다. */
 function bailoutChildren(
@@ -28,7 +54,7 @@ function bailoutChildren(
 function beginWork(
   fiber: Fiber,
   rootChildren: ElementChild,
-  activeElements: Set<symbol>,
+  path: ElementPath,
   reusedParents: ParentFiber[],
   renderLanes: Lanes,
 ): ChildFiber | null {
@@ -50,9 +76,7 @@ function beginWork(
   }
 
   const { pendingProps } = fiber;
-  const token = getCycleToken(fiber);
-  if (activeElements.has(token)) throw new TypeError('Cycle in Element children');
-  activeElements.add(token);
+  enterElement(fiber, path);
   const current = fiber.alternate;
   if (current !== null && current.memoizedProps === pendingProps && !hasUpdate) {
     return bailoutChildren(fiber, current, renderLanes, reusedParents);
@@ -64,11 +88,17 @@ function beginWork(
     const result = renderWithHooks(fiber, renderLanes);
     // 여러 갱신을 적용한 최종 상태가 같으면 이번 lane의 자손 작업만 계속한다.
     if (current !== null && current.memoizedProps === pendingProps && !result.didReceiveUpdate) {
+      fiber.flags &= ~Passive;
       return bailoutChildren(fiber, current, renderLanes, reusedParents);
     }
     children = result.children;
   } else if (Object.hasOwn(pendingProps, 'children')) {
     children = pendingProps.children;
+    if (typeof children === 'string' || typeof children === 'number') {
+      // 호스트 자신이 텍스트를 쓴다. 이전에 Fiber 자식이 있었다면 삭제와 Hook 정리를 예약한다.
+      fiber.memoizedProps = pendingProps;
+      return current?.child ? reconcileChildren(fiber, null) : null;
+    }
   }
   const child = reconcileChildren(fiber, children);
   fiber.memoizedProps = pendingProps;
@@ -81,7 +111,7 @@ type CompleteWork = (fiber: Fiber) => void;
 /** 완료한 Fiber와 그 자손의 플래그를 부모에 합친다. 다음 형제가 없으면 부모로 올라가서 완료를 이어 간다. */
 function completeUnitOfWork(
   fiber: Fiber,
-  activeElements: Set<symbol>,
+  path: ElementPath,
   completeWork?: CompleteWork,
 ): ChildFiber | null {
   let completed: Fiber | null = fiber;
@@ -92,7 +122,9 @@ function completeUnitOfWork(
       parent.subtreeFlags |= completed.flags | completed.subtreeFlags;
       parent.childLanes |= completed.lanes | completed.childLanes;
     }
-    if (completed.tag === 'element' || completed.tag === 'function') activeElements.delete(getCycleToken(completed));
+    if (path.activeIds !== null && (completed.tag === 'element' || completed.tag === 'function')) {
+      path.activeIds.delete(completed.elementId);
+    }
     if (completed.sibling !== null) return completed.sibling;
     completed = parent;
   }
@@ -112,16 +144,8 @@ export interface RenderWork {
 
 /** 삭제된 가지 안에서만 child·sibling·return을 따라가며 함수 컴포넌트의 setter 연결을 끊는다. */
 function detachSubtreeHooks(deleted: ChildFiber): void {
-  let fiber: Fiber = deleted;
-  for (;;) {
+  for (let fiber: ChildFiber | null = deleted; fiber !== null; fiber = nextInSubtree(fiber, deleted)) {
     if (fiber.tag === 'function') detachHooks(fiber);
-    if (fiber.child !== null) {
-      fiber = fiber.child;
-      continue;
-    }
-    while (fiber !== deleted && fiber.sibling === null) fiber = fiber.return!;
-    if (fiber === deleted) return;
-    fiber = fiber.sibling!;
   }
 }
 
@@ -132,7 +156,7 @@ export function createRenderWork(
   completeWork?: CompleteWork,
   renderLanes: Lanes = NoLanes,
 ): RenderWork {
-  const activeElements = new Set<symbol>();
+  const path: ElementPath = { activeIds: null };
   const reusedParents: ParentFiber[] = [];
   const hookOwners: FunctionFiber[] = [];
   const deletedChildren: ChildFiber[][] = [];
@@ -164,10 +188,10 @@ export function createRenderWork(
     run(shouldYield) {
       while (workInProgress !== null) {
         const fiber: Fiber = workInProgress;
-        const child = beginWork(fiber, children, activeElements, reusedParents, renderLanes);
+        const child = beginWork(fiber, children, path, reusedParents, renderLanes);
         if (fiber.tag === 'function' && fiber.memoizedState !== null) hookOwners.push(fiber);
         if (fiber.deletions !== null) deletedChildren.push(fiber.deletions);
-        workInProgress = child ?? completeUnitOfWork(fiber, activeElements, completeWork);
+        workInProgress = child ?? completeUnitOfWork(fiber, path, completeWork);
         if (workInProgress !== null && shouldYield?.()) return false;
       }
       return true;

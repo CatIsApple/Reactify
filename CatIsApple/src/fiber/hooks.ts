@@ -1,4 +1,5 @@
 import type { ElementChild } from '../element/types.js';
+import { Passive } from './flags.js';
 import { getHighestPriorityLane, NoLane, NoLanes, type Lane, type Lanes } from './lanes.js';
 import type { Fiber, FiberRootInstance, FunctionFiber } from './types.js';
 import { requestUpdateLane } from './updatePriority.js';
@@ -7,6 +8,18 @@ import { requestUpdateLane } from './updatePriority.js';
 export type SetStateAction<S> = S | ((previous: S) => S);
 /** 업데이트 하나를 접수하는 함수다. 동일한 Hook은 커밋을 거쳐도 같은 함수를 반환한다. */
 export type Dispatch<A> = (action: A) => void;
+
+/** 의존성은 호출마다 같은 길이의 배열로 넘기며 각 항목을 Object.is로 비교한다. */
+type Dependencies = readonly unknown[];
+/** 커밋 후 실행할 설정 함수. 반환한 함수는 다음 설정 전이나 언마운트 때 호출한다. */
+export type EffectCallback = () => void | (() => void);
+
+/** 한 렌더의 설정 함수와 변경 여부. 두 Fiber가 공유하는 instance에는 실제 실행한 설정의 정리 함수가 남는다. */
+export interface PassiveEffect {
+  create: EffectCallback;
+  instance: { destroy: (() => void) | undefined };
+  changed: boolean;
+}
 
 /** 특정 lane에서 처리할 상태 변경. 큐가 비어 있을 때 미리 계산한 결과를 재사용할 수 있다. */
 interface StateUpdate {
@@ -33,14 +46,34 @@ interface StateQueue {
 
 /** 함수 Fiber의 memoizedState에서 호출 순서로 연결되는 Hook. 낮은 우선순위 갱신을 위해 기준 상태와 큐를 둔다. */
 export interface StateHook {
+  kind: 'state';
   memoizedState: unknown;
   baseState: unknown;
   baseQueue: StateUpdate[];
   queue: StateQueue;
   /** 이번 렌더가 읽은 마지막 대기 노드. 커밋은 이 위치까지만 소비한다. */
   pendingThrough: PendingUpdate | null;
-  next: StateHook | null;
+  next: Hook | null;
 }
+
+/** 이 호출 위치에서 계산한 값과 그 계산에 사용한 의존성을 함께 보관한다. */
+interface MemoHook {
+  kind: 'memo';
+  value: unknown;
+  deps: Dependencies | null;
+  next: Hook | null;
+}
+
+/** 이 호출 위치의 passive effect와 의존성을 보관한다. */
+interface EffectHook {
+  kind: 'effect';
+  effect: PassiveEffect;
+  deps: Dependencies | null;
+  next: Hook | null;
+}
+
+/** 함수 Fiber의 memoizedState에 호출 순서대로 연결되는 Hook 슬롯. */
+export type Hook = StateHook | MemoHook | EffectHook;
 
 /** 한 컴포넌트 호출의 Hook 커서와 해당 렌더 안에서만 유효한 상태 요청들이다. */
 interface HookRender {
@@ -48,9 +81,12 @@ interface HookRender {
   lanes: Lanes;
   mounting: boolean;
   rerendering: boolean;
-  source: StateHook | null;
-  first: StateHook | null;
-  last: StateHook | null;
+  source: Hook | null;
+  /** 렌더 중 재호출에도 effect의 비교 기준은 마지막으로 커밋된 슬롯이다. */
+  committed: Hook | null;
+  first: Hook | null;
+  last: Hook | null;
+  hasPassive: boolean;
   mounted: Set<StateQueue> | null;
   renderActions: Map<StateQueue, unknown[]> | null;
   nextActions: Map<StateQueue, unknown[]> | null;
@@ -63,22 +99,22 @@ interface HookRenderResult {
 }
 
 let rendering: HookRender | null = null;
-let evaluatingState = false;
+let evaluatingHookCallback = false;
 
-/** 사용자 초기화 함수와 updater를 실행한다. 이 함수들 안에서 Hook을 추가로 호출하는 실수를 감지한다. */
-function callStateCallback(callback: () => unknown): unknown {
-  const wasEvaluating = evaluatingState;
-  evaluatingState = true;
+/** 상태 초기화·갱신 함수나 메모 계산 함수를 실행하는 동안 중첩된 Hook 호출을 감지한다. */
+function callHookCallback<T>(callback: () => T): T {
+  const wasEvaluating = evaluatingHookCallback;
+  evaluatingHookCallback = true;
   try {
     return callback();
   } finally {
-    evaluatingState = wasEvaluating;
+    evaluatingHookCallback = wasEvaluating;
   }
 }
 
 /** 함수형 업데이트에는 직전 상태를 넘기고, 값 업데이트는 전달된 값으로 교체한다. */
 function applyAction(action: unknown, previous: unknown): unknown {
-  return typeof action === 'function' ? callStateCallback(() => action(previous)) : action;
+  return typeof action === 'function' ? callHookCallback(() => action(previous)) : action;
 }
 
 /** setter를 소유한 Fiber의 return 링크를 따라 현재 루트를 찾는다. */
@@ -124,13 +160,13 @@ function dispatchState(queue: StateQueue, action: unknown): void {
 
 /** 최초 호출에만 초기 상태를 계산하고, 현재 트리와 작업 트리가 공유할 setter 하나를 만든다. */
 function mountState(initial: unknown): StateHook {
-  const state = typeof initial === 'function' ? callStateCallback(() => initial()) : initial;
+  const state = typeof initial === 'function' ? callHookCallback(() => initial()) : initial;
   const queue: StateQueue = {
     owner: null, current: null, first: null, last: null,
     /** 렌더 사이에 공유하는 큐에 상태 변경을 추가한다. */
     dispatch(action) { dispatchState(queue, action); },
   };
-  return { memoizedState: state, baseState: state, baseQueue: [], queue, pendingThrough: null, next: null };
+  return { kind: 'state', memoizedState: state, baseState: state, baseQueue: [], queue, pendingThrough: null, next: null };
 }
 
 /** 재적용할 기준 목록 다음에, 렌더 시작 시점에 보이던 공유 대기 요청까지만 접수 순서로 읽는다. */
@@ -178,10 +214,49 @@ function rerenderState(source: StateHook, frame: HookRender): StateHook {
   const hook = { ...source, next: null };
   const actions = frame.renderActions?.get(source.queue);
   if (actions) {
-    for (const action of actions) hook.memoizedState = applyAction(action, hook.memoizedState);
+    for (const action of actions) {
+      hook.memoizedState = applyAction(action, hook.memoizedState);
+    }
     if (hook.baseQueue.length === 0) hook.baseState = hook.memoizedState;
   }
   return hook;
+}
+
+/** 각 공개 Hook은 함수 컴포넌트를 실행 중인 프레임 안에서만 슬롯을 읽을 수 있다. */
+function currentRender(name: string): HookRender {
+  if (rendering === null || evaluatingHookCallback) {
+    throw new Error(`${name} must be called at the top level of a function component`);
+  }
+  return rendering;
+}
+
+/** 갱신 시 직전 패스의 같은 위치에서 같은 종류의 Hook을 읽고 두 커서를 한 칸 이동한다. */
+function takeHook<K extends Hook['kind']>(frame: HookRender, kind: K): Extract<Hook, { kind: K }> | null {
+  if (frame.mounting) return null;
+  const source = frame.source;
+  if (source === null) throw new Error('Rendered more hooks than during the previous render');
+  if (source.kind !== kind) throw new Error(`Hook order changed: expected ${source.kind}, received ${kind}`);
+  frame.source = source.next;
+  frame.committed = frame.committed?.next ?? null;
+  return source as Extract<Hook, { kind: K }>;
+}
+
+/** 이번 호출에서 만든 슬롯을 작업 중인 Hook 목록 끝에 연결한다. */
+function appendHook(frame: HookRender, hook: Hook): void {
+  if (frame.last === null) frame.first = hook;
+  else frame.last.next = hook;
+  frame.last = hook;
+}
+
+/** React처럼 대응하는 항목을 Object.is로 비교하고 의존성 배열의 길이가 바뀌면 사용 오류를 알린다. */
+function sameDependencies(previous: Dependencies | null, next: Dependencies | null): boolean {
+  if (previous === null || next === null) return false;
+  if (previous.length !== next.length) console.error('Hook dependency arrays must keep the same length between renders.');
+  const length = Math.min(previous.length, next.length);
+  for (let i = 0; i < length; i++) {
+    if (!Object.is(previous[i], next[i])) return false;
+  }
+  return true;
 }
 
 /** 초기 상태를 생략한 Hook은 undefined에서 시작한다. */
@@ -190,27 +265,56 @@ export function useState<S = undefined>(): [S | undefined, Dispatch<SetStateActi
 export function useState<S>(initial: S | (() => S)): [S, Dispatch<SetStateAction<S>>];
 /** 현재 함수의 Hook 호출 순서에 따라 새 슬롯을 만들거나 이전 슬롯을 이어받는다. */
 export function useState(initial?: unknown): [unknown, Dispatch<unknown>] {
-  const frame = rendering;
-  if (frame === null || evaluatingState) throw new Error('useState must be called at the top level of a function component');
+  const frame = currentRender('useState');
+  const source = takeHook(frame, 'state');
   let hook: StateHook;
-  if (frame.mounting) {
+  if (source === null) {
     hook = mountState(initial);
     (frame.mounted ??= new Set()).add(hook.queue);
   } else {
-    if (frame.source === null) throw new Error('Rendered more hooks than during the previous render');
-    hook = frame.rerendering ? rerenderState(frame.source, frame) : updateState(frame.source, frame);
-    frame.source = frame.source.next;
+    hook = frame.rerendering ? rerenderState(source, frame) : updateState(source, frame);
   }
-  if (frame.last === null) frame.first = hook;
-  else frame.last.next = hook;
-  frame.last = hook;
+  appendHook(frame, hook);
   return [hook.memoizedState, hook.queue.dispatch];
 }
 
-/** 최종 상태가 이전 커밋과 같은지 Hook의 호출 순서대로 비교한다. */
-function stateChanged(previous: StateHook | null, next: StateHook | null): boolean {
+/** 같은 의존성이면 직전 패스의 값을 재사용하고, 새 계산 결과는 작업 중인 Fiber에만 기록한다. */
+export function useMemo<T>(calculate: () => T, dependencies?: Dependencies | null): T {
+  const frame = currentRender('useMemo');
+  const source = takeHook(frame, 'memo');
+  const deps = dependencies ?? null;
+  if (source !== null && sameDependencies(source.deps, deps)) {
+    appendHook(frame, { ...source, next: null });
+    return source.value as T;
+  }
+  const value = callHookCallback(calculate);
+  appendHook(frame, { kind: 'memo', value, deps, next: null });
+  return value;
+}
+
+/** 마지막 커밋의 의존성과 비교해 설정 함수를 기록한다. 실행과 정리는 성공한 커밋에서 예약한다. */
+export function useEffect(create: EffectCallback, dependencies?: Dependencies | null): void {
+  const frame = currentRender('useEffect');
+  const committed = frame.committed;
+  const source = takeHook(frame, 'effect');
+  const deps = dependencies ?? null;
+  const changed = committed?.kind !== 'effect' || !sameDependencies(committed.deps, deps);
+  const instance = source?.effect.instance ?? { destroy: undefined };
+  appendHook(frame, { kind: 'effect', deps, effect: { create, instance, changed }, next: null });
+  if (changed) frame.hasPassive = true;
+}
+
+/** 업데이트는 바뀐 effect만, 삭제는 해당 컴포넌트의 모든 effect를 원래 호출 순서로 읽는다. */
+export function* getPassiveEffects(fiber: FunctionFiber, changedOnly: boolean): IterableIterator<PassiveEffect> {
+  for (let hook = fiber.memoizedState; hook !== null; hook = hook.next) {
+    if (hook.kind === 'effect' && (!changedOnly || hook.effect.changed)) yield hook.effect;
+  }
+}
+
+/** useState의 최종 값이 이전 커밋과 같은지 확인한다. 메모와 effect는 스스로 렌더를 예약하지 않는다. */
+function stateChanged(previous: Hook | null, next: Hook | null): boolean {
   while (previous !== null && next !== null) {
-    if (!Object.is(previous.memoizedState, next.memoizedState)) return true;
+    if (previous.kind === 'state' && next.kind === 'state' && !Object.is(previous.memoizedState, next.memoizedState)) return true;
     previous = previous.next;
     next = next.next;
   }
@@ -223,7 +327,8 @@ export function renderWithHooks(fiber: FunctionFiber, renderLanes: Lanes): HookR
   const previousState = fiber.alternate?.memoizedState ?? null;
   const frame: HookRender = {
     fiber, lanes: renderLanes, mounting: fiber.alternate === null, rerendering: false,
-    source: previousState, first: null, last: null, mounted: null, renderActions: null, nextActions: null,
+    source: previousState, committed: previousState, first: null, last: null,
+    hasPassive: false, mounted: null, renderActions: null, nextActions: null,
   };
   const Component = fiber.type as (props: typeof fiber.pendingProps) => ElementChild;
   rendering = frame;
@@ -233,11 +338,14 @@ export function renderWithHooks(fiber: FunctionFiber, renderLanes: Lanes): HookR
       if (frame.source !== null) throw new Error('Rendered fewer hooks than during the previous render');
       if (frame.nextActions === null) {
         fiber.memoizedState = frame.first;
+        if (frame.hasPassive) fiber.flags |= Passive;
         return { children, didReceiveUpdate: stateChanged(previousState, frame.first) };
       }
       frame.mounting = false;
       frame.rerendering = true;
       frame.source = frame.first;
+      frame.committed = previousState;
+      frame.hasPassive = false;
       frame.first = frame.last = null;
       frame.renderActions = frame.nextActions;
       frame.nextActions = null;
@@ -251,13 +359,16 @@ export function renderWithHooks(fiber: FunctionFiber, renderLanes: Lanes): HookR
 /** 새 DOM의 연결 콜백에서 발생하는 상태 요청을 첫 마운트의 Hook 큐에 임시 보관한다. */
 export function stageMountHooks(fiber: FunctionFiber): void {
   if (fiber.alternate !== null) return;
-  for (let hook = fiber.memoizedState; hook !== null; hook = hook.next) hook.queue.owner = fiber;
+  for (let hook = fiber.memoizedState; hook !== null; hook = hook.next) {
+    if (hook.kind === 'state') hook.queue.owner = fiber;
+  }
 }
 
 /** DOM 커밋에 성공한 Hook만 setter의 소유자로 지정하고, 그 렌더 이후에 들어온 대기 요청은 남겨 둔다. */
 export function commitHooks(fiber: FunctionFiber): void {
   let mountLanes = NoLanes;
   for (let hook = fiber.memoizedState; hook !== null; hook = hook.next) {
+    if (hook.kind !== 'state') continue;
     const { queue, pendingThrough } = hook;
     if (queue.current === null) {
       for (let node = queue.first; node !== null; node = node.next) mountLanes |= node.update.lane;
@@ -283,6 +394,7 @@ export function commitHooks(fiber: FunctionFiber): void {
 /** 제거된 컴포넌트의 setter가 이전 트리를 붙잡거나 루트에 새 작업을 예약하지 않도록 큐 연결을 해제한다. */
 export function detachHooks(fiber: FunctionFiber): void {
   for (let hook = fiber.memoizedState; hook !== null; hook = hook.next) {
+    if (hook.kind !== 'state') continue;
     const queue = hook.queue;
     queue.owner = null;
     queue.current = null;

@@ -1,6 +1,8 @@
-import { Update } from '../fiber/flags.js';
+import { getDirectText } from '../element/directText.js';
+import { ContentReset, Update } from '../fiber/flags.js';
 import type { Fiber, HostElementFiber, TextFiber } from '../fiber/types.js';
 import { readAttributes, setAttribute } from './attributes.js';
+import { captureFocus } from './focus.js';
 import { hostNodes } from './hostNodes.js';
 
 const attributesByFiber = new WeakMap<HostElementFiber, Map<string, string>>();
@@ -31,25 +33,28 @@ function completeElement(fiber: HostElementFiber, doc: Document): void {
   const { type } = fiber;
   const tag = type.toLowerCase();
   if (tag === 'svg' || tag === 'math' || tag === 'template') throw new TypeError(`Unsupported HTML host: ${tag}`);
-  if (fiber.child && voidTags.has(tag)) throw new TypeError(`HTML element ${tag} cannot have children`);
+  const text = getDirectText(fiber.pendingProps);
+  if ((fiber.child || text !== null) && voidTags.has(tag)) throw new TypeError(`HTML element ${tag} cannot have children`);
   const next = readAttributes(fiber.pendingProps);
   attributesByFiber.set(fiber, next);
 
-  if (fiber.alternate !== null) {
-    const previous = attributesByFiber.get(fiber.alternate)!;
+  if (current !== null) {
+    const previous = attributesByFiber.get(current)!;
     if (!changedAttributes(previous, next).next().done) fiber.flags |= Update;
+    if (text !== getDirectText(current.memoizedProps)) fiber.flags |= text === null ? ContentReset : Update;
     return;
   }
 
   const node = doc.createElement(type);
   for (const [name, value] of next) node.setAttribute(name, value);
+  if (text !== null && text !== '') node.textContent = text;
   for (let child = fiber.child; child !== null; child = child.sibling) {
     for (const childNode of hostNodes(child)) node.appendChild(childNode);
   }
   fiber.stateNode = node;
 }
 
-/** 자식 작업이 끝난 호스트 요소나 텍스트의 DOM을 준비하고 기존 노드의 변경 여부를 표시한다. */
+/** 호스트 요소 또는 텍스트 노드를 준비하고 커밋할 변경을 표시한다. */
 export function completeHostWork(fiber: Fiber, container: Element): void {
   if (fiber.tag === 'element') {
     completeElement(fiber, container.ownerDocument);
@@ -59,16 +64,40 @@ export function completeHostWork(fiber: Fiber, container: Element): void {
   }
 }
 
+/** 기존 Text 노드를 그대로 갱신하고, 쓰기 전후 어느 시점에 실패하더라도 이전 문자열을 복구한다. */
+function commitTextData(node: Text, text: string, undo: Array<() => void>): void {
+  const before = node.data;
+  if (before === text) return;
+  undo.push(() => {
+    if (node.data !== before) node.data = before;
+  });
+  node.data = text;
+}
+
+/** 호스트의 단일 텍스트를 쓰거나 비운다. 자식 교체를 되돌릴 때 원래 DOM 객체와 순서를 복원한다. */
+export function commitTextContent(node: Element, text: string, undo: Array<() => void>): void {
+  const first = node.firstChild;
+  if (first === null && text === '') return;
+  if (text !== '' && first !== null && first.nodeType === first.TEXT_NODE && first === node.lastChild) {
+    commitTextData(first as Text, text, undo);
+    return;
+  }
+  const previous = Array.from(node.childNodes);
+  const restoreFocus = first === null ? null : captureFocus(node);
+  undo.push(() => {
+    if (node.childNodes.length !== previous.length || previous.some((child, index) => node.childNodes[index] !== child)) {
+      if (node.firstChild !== null) node.replaceChildren();
+      for (const child of previous) node.appendChild(child);
+    }
+    restoreFocus?.();
+  });
+  node.textContent = text;
+}
+
 /** Update가 표시된 노드에 렌더 결과를 반영한다. 쓰기 직전의 실제 DOM 값으로 커밋 실패 시 복구한다. */
 export function commitHostUpdate(fiber: HostElementFiber | TextFiber, undo: Array<() => void>): void {
   if (fiber.tag === 'text') {
-    const node = fiber.stateNode!;
-    const before = node.data;
-    if (before !== fiber.text) {
-      // 커밋이 실패하면 이 텍스트 노드의 이전 문자열을 복원한다.
-      undo.push(() => { if (node.data !== before) node.data = before; });
-      node.data = fiber.text;
-    }
+    commitTextData(fiber.stateNode!, fiber.text, undo);
     return;
   }
 
@@ -84,4 +113,6 @@ export function commitHostUpdate(fiber: HostElementFiber | TextFiber, undo: Arra
     });
     setAttribute(node, name, value);
   }
+  const text = getDirectText(fiber.pendingProps);
+  if (text !== null && text !== getDirectText(fiber.alternate!.memoizedProps)) commitTextContent(node, text, undo);
 }

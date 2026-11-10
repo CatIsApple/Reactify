@@ -14,11 +14,11 @@ v2는 `createElement → Fiber 렌더 → DOM 커밋` 경로를 TypeScript stric
 | 자식 인자 한 개 또는 여러 개 전달 | 한 개는 그 값 자체, 여러 개는 입력 순서의 배열이다. 명시한 자식이 `config.children`보다 우선한다. 숫자 0, 빈 값, 중첩 Element도 생성 시 보존한다. |
 | 같은 자식 Element를 두 곳에 사용 | 생성 과정에서 그 자식이나 입력 설정을 수정하지 않는다. 각 위치의 부모 관계는 나중에 Fiber가 표현한다. |
 
-개인 README에 중첩 Element 예시와 입력 규칙을 기록했다. Node에서 `key` 생략·상속·명시적 `null`, 자식 생략·명시적 `undefined`, 동결한 입력, 함수 참조와 중첩 Element 재사용을 검증했다. [실행 예시](../../README.md) · [검증 지침](../../../CLAUDE.md#ai-검증-요청)
+Node에서 `key` 생략·상속·명시적 `null`, 자식 생략·명시적 `undefined`, 동결한 입력, 함수 참조와 중첩 Element 재사용을 검증했다. [빌드와 사용](../../README.md#빌드와-사용) · [검증 지침](../../../CLAUDE.md#ai-검증-요청)
 
 ## 2. Fiber 트리 — 완료
 
-Element 트리 하나를 받아 동기적으로 순회할 수 있는 작업 트리를 만든다. 루트 아래에서 `child`는 첫 자식, `sibling`은 다음 형제, `return`은 부모를 가리킨다. 문자열·숫자는 텍스트 작업으로 바꾸고, `null`·`undefined`·불리언은 화면에서 생략한다. 배열은 순서대로 순회한다. **완료 기준**은 중첩 요소, 두 형제, 숫자 0이 있는 트리를 DOM 없이 순회해 순서와 부모 관계를 확인하는 것이다. 같은 Element를 두 위치에 넣으면 서로 다른 Fiber가 생겨야 한다.
+Element 트리 하나를 받아 동기적으로 순회할 수 있는 작업 트리를 만든다. 루트 아래에서 `child`는 첫 자식, `sibling`은 다음 형제, `return`은 부모를 가리킨다. 호스트 요소의 자식 하나가 문자열·숫자이면 그 호스트가 텍스트를 직접 쓰고, 그 밖의 텍스트는 별도 Fiber로 처리한다. `null`·`undefined`·불리언은 화면에서 생략한다. 배열은 순서대로 순회한다. **완료 기준**은 중첩 요소, 두 형제, 숫자 0이 있는 트리를 DOM 없이 순회해 순서와 부모 관계를 확인하는 것이다. 같은 Element를 두 위치에 넣으면 서로 다른 Fiber가 생겨야 한다.
 
 `npm run typecheck`와 `npm run build`를 통과했다. 빌드 결과를 Node에서 직접 실행해 부모·형제 링크, 공유 Element의 위치별 Fiber 생성, 함수 컴포넌트의 자식 입력 보존, 20,000단계 중첩과 순환 참조 처리를 확인했다. [작업 루프](../../src/fiber/workLoop.ts)
 
@@ -38,7 +38,7 @@ HostRoot 두 개는 `alternate`로 연결하며 `root.current`가 커밋된 쪽�
 
 ## 5. HostRoot 업데이트 큐와 스케줄러
 
-`root.render(children): void`는 화면 갱신을 예약한다. 완료 Promise를 반환하지 않고 자식만 받으며, `runWithPriority`와 `startTransition`으로 우선순위를 지정한다. `prepare()`와 `commit()`은 동기 관찰용 API로 유지한다. 클릭·연속 입력·전환 등 [호출 문맥](../../src/fiber/updatePriority.ts)에서 lane을 선택한다. 루트의 화면 요청을 접수 순서로 큐에 넣고, 이번 렌더의 lane에 해당하는 요청을 적용한다. 건너뛴 요청은 기준 화면과 함께 보관하고 그 뒤 이미 처리한 요청은 `NoLane`으로 재적용한다. Sync는 마이크로태스크에서 처리하고, 전환·유휴 작업은 Fiber 사이에서 양보할 수 있다. DOM 커밋은 동기로 끝낸다. [우선순위와 큐 사용 예](../../README.md#hostroot의-업데이트-큐와-스케줄링) · [구현](../../src/fiber/updateQueue.ts)
+`root.render(children): void`는 화면 갱신을 예약한다. 완료 Promise를 반환하지 않고 자식만 받으며, `runWithPriority`와 `startTransition`으로 우선순위를 지정한다. `prepare()`와 `commit()`은 동기 관찰용 API로 유지한다. 클릭·연속 입력·전환 등 [호출 문맥](../../src/fiber/updatePriority.ts)에서 lane을 선택한다. 루트의 화면 요청을 접수 순서로 큐에 넣고, 이번 렌더의 lane에 해당하는 요청을 적용한다. 건너뛴 요청은 기준 화면과 함께 보관하고 그 뒤 이미 처리한 요청은 `NoLane`으로 재적용한다. Sync는 마이크로태스크에서 처리하고, 전환·유휴 작업은 Fiber 사이에서 양보할 수 있다. DOM 커밋은 동기로 끝낸다. [요청과 스케줄링 흐름](../../README.md#렌더링-구조) · [구현](../../src/fiber/updateQueue.ts)
 
 **완료 기준**은 낮은 우선순위 A 다음 긴급 B가 도착했을 때 B가 먼저 커밋되고 A를 처리한 뒤에도 화면이 B인 것이다. 같은 lane의 여러 요청은 한 렌더에서 처리할 수 있어야 한다. 렌더 중 선점, 여러 루트의 예약, 커밋 실패 후 재시도에서도 요청 유실이 없어야 한다. 예약 호출 직후의 DOM을 완료 결과로 간주하지 않고 실제 DOM과 커밋된 `current`를 관찰한다.
 
