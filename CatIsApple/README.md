@@ -25,87 +25,73 @@ root.render(createElement('h1', { className: 'title' }, 'Reactify'));
 
 ## New Changes
 
-v1은 상태와 Hook을 루트 컴포넌트에만 둡니다. 어느 값이 바뀌든 루트부터 다시 실행하고 Virtual DOM 전체를 비교합니다. Reactify는 화면을 **Element → Fiber → DOM** 세 층으로 나누고 상태를 각 컴포넌트의 Fiber에 둡니다.
+v1은 과제 구조대로 상태를 루트 컴포넌트에만 두고, 시작한 렌더를 끝까지 실행합니다. 이 구조에서는 아래 세 가지를 피할 수 없어 Fiber 구조를 도입했습니다.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/pipeline-dark.png">
-  <img src="assets/pipeline-light.png" alt="createElement가 만든 Element를 render 단계의 Fiber가 비교하고, flags로 표시한 변경을 commit 단계에서 DOM에 반영하는 흐름">
-</picture>
-
-| Change | Enables | Evidence |
-| --- | --- | --- |
-| [Element → Fiber → DOM](#element--fiber--dom) | 비교가 끝난 변경만 DOM에 씁니다. | 같은 값으로 4,000행을 다시 렌더하면 DOM 변경 0건 |
-| [Fiber Architecture](#fiber-architecture) | 렌더를 멈추고, 버리고, 다시 시작합니다. | 렌더 도중 들어온 갱신이 먼저 커밋 |
-| [Lanes Scheduling](#lanes-scheduling) | 우선순위를 두고 긴 렌더는 양보합니다. | 10,000행 마운트 중 최장 차단 35.0 → 7.8 ms |
-| [Bailout](#bailout) | 변경이 없는 컴포넌트는 호출하지 않습니다. | 한 행 변경 시 컴포넌트 호출 4,000 → 1회 |
+- **Full re-run** — 한 곳만 바뀌어도 루트부터 전부 다시 실행합니다. → [Bailout](#bailout)
+- **No interruption** — 큰 렌더가 끝날 때까지 입력이 막힙니다. → [Fiber Architecture](#fiber-architecture), [Lanes Scheduling](#lanes-scheduling)
+- **Diff and patch in one pass** — 계산을 미루거나 버릴 수 없습니다. → [Element → Fiber → DOM](#element--fiber--dom)
 
 ### Element → Fiber → DOM
 
-| Layer | Responsibility |
-| --- | --- |
-| Element | 이번 렌더의 화면 설명 `{ type, key, props }`. 만들고 나면 바꾸지 않습니다. |
-| Fiber | 위치별 상태, 지난 props, DOM 참조, 남은 업데이트, 커밋할 변경을 보관합니다. |
-| DOM | 커밋 단계에서만 바뀝니다. 표시된 변경만 반영합니다. |
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/pipeline-dark.png">
+  <img src="assets/pipeline-light.png" alt="Element 트리가 render 단계에서 Fiber 트리와 비교되어 한 노드에 Update flag가 붙고, commit 단계에서 그 노드만 DOM에 쓰이는 흐름">
+</picture>
 
-![화면 요청과 상태 요청이 각자의 큐를 거쳐 루트 스케줄러에 모이고, Fiber 렌더와 DOM 커밋으로 이어지는 흐름](assets/fiber-render-flow.png)
-
-- **Child matching** — `key`가 있으면 key로, 없으면 배열의 위치로 이전 Fiber를 찾습니다. 타입까지 같으면 상태와 DOM을 재사용합니다.
-- **Host attributes** — 렌더는 props 객체가 바뀐 요소에 `Update`만 표시하고, 커밋이 이전 props와 새 props를 비교해 바뀐 값만 씁니다.
-- **Direct text** — 자식이 문자열이나 숫자 하나뿐이면 텍스트용 Fiber 없이 그 요소가 텍스트를 직접 갱신합니다.
+- **Why** — 비교(render)와 반영(commit)을 나눠야 렌더를 멈추거나 버릴 수 있습니다.
+- **How** — Element는 매 렌더의 입력, Fiber는 비교하는 자리입니다. DOM은 flag가 붙은 노드만 바뀝니다.
+- **Result** — 같은 값으로 4,000행을 다시 렌더하면 DOM 변경 **0건**입니다.
 
 ### Fiber Architecture
 
-- **Linked list** — `child` · `sibling` · `return`으로 이어진 Fiber를 반복문으로 순회합니다. Fiber 하나 단위로 멈췄다가 이어갈 수 있습니다.
-- **Double buffering** — 화면과 일치하는 `current`는 그대로 두고 짝(`alternate`)인 작업 트리에서만 계산합니다. 렌더를 버려도 화면은 그대로입니다.
-- **Flags** — 렌더는 `Placement` · `Update` · `ChildDeletion` 플래그만 남기고, 커밋은 플래그가 없는 가지에 들어가지 않습니다.
-- **Atomic commit** — 쓰기 직전의 DOM 값과 노드 위치를 기록해, 커밋 중 오류가 나면 역순으로 복구합니다.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/fiber-work-loop-dark.png">
+  <img src="assets/fiber-work-loop-light.png" alt="child와 sibling 링크로 이어진 Fiber 트리에서 처리한 Fiber, 멈춘 자리의 Fiber, 남은 Fiber를 구분한 그림">
+</picture>
+
+- **Why** — 재귀 호출은 중간에 멈출 수 없습니다.
+- **How** — Fiber를 `child` · `sibling` · `return`으로 잇고 반복문으로 순회합니다. 화면과 일치하는 `current`는 그대로 두고 짝(`alternate`)에서만 계산합니다.
+- **Result** — 멈춘 Fiber 하나만 기억하면 이어갈 수 있고, 렌더를 버려도 화면은 그대로입니다. 커밋 중 오류가 나면 역순으로 복구합니다.
 
 [Fiber types](src/fiber/types.ts) · [Work loop](src/fiber/workLoop.ts) · [DOM commit](src/dom/commitWork.ts)
 
 ### Lanes Scheduling
 
-갱신마다 우선순위 비트(lane)를 붙이고, `lanes & -lanes`로 가장 급한 lane을 고릅니다.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/lanes-dark.png">
+  <img src="assets/lanes-light.png" alt="Transition 렌더가 5 ms 단위로 진행되다가 click이 들어오면 버려지고, Sync 갱신이 먼저 커밋된 뒤 Transition 렌더가 처음부터 다시 실행되는 타임라인">
+</picture>
 
-| Source | Lane | Rendering |
-| --- | --- | --- |
-| `click`, `keydown`, `input` 등 | `SyncLane` | 마이크로태스크에서 바로 끝까지 |
-| `scroll`, `pointermove` 등 | `InputContinuousLane` | 시작하면 끝까지 |
-| 그 밖의 코드 | `DefaultLane` | 시작하면 끝까지 |
-| `startTransition(scope)` | `TransitionLanes` | 5 ms마다 양보, 급한 요청이 오면 중단 후 다시 시작 |
-| `runWithPriority('idle', scope)` | `IdleLane` | 5 ms마다 양보 |
-
-10,000행 마운트 중 메인 스레드가 가장 오래 막힌 시간은 Sync 35.0 ms에서 Transition **7.8 ms**로 줄었습니다. 그 도중에 넣은 Sync 갱신은 0.2 ms 만에 먼저 커밋됐습니다.
+- **Why** — 모든 갱신을 같은 순서로 처리하면 큰 렌더가 클릭을 막습니다.
+- **How** — 갱신마다 우선순위 비트(lane)를 붙입니다. `click` → Sync, `scroll` → InputContinuous, 그 외 → Default, `startTransition` → Transition(5 ms마다 양보).
+- **Result** — 10,000행 마운트 중 최장 차단이 35.0 → **7.8 ms**로 줄었습니다. 도중에 넣은 Sync 갱신은 **0.2 ms** 만에 먼저 커밋됩니다.
 
 [Lanes](src/fiber/lanes.ts) · [Root scheduler](src/fiber/rootScheduler.ts) · [Host scheduler](src/scheduler/scheduler.ts)
 
 ### Bailout
 
-`setState`는 해당 Fiber에 lane을 표시하고 조상들의 `childLanes`에 같은 비트를 기록합니다. 렌더는 이 표시를 따라 내려갑니다.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/bailout-dark.png">
+  <img src="assets/bailout-light.png" alt="HostRoot에서 setState가 일어난 컴포넌트까지의 경로만 복사하고, 그 아래만 다시 호출하며, 나머지 가지는 방문하지 않는 Fiber 트리">
+</picture>
 
-| Condition | Result |
-| --- | --- |
-| props가 같고, 자신과 자손에 일이 없음 | 서브트리 전체를 이전 트리와 공유합니다. |
-| props가 같고, 자손에만 일이 있음 | 함수를 호출하지 않고 직계 자식만 복제해 내려갑니다. |
-| 다시 호출했지만 state가 이전과 같음 | 자식 비교를 건너뜁니다. |
-| `setState`로 넘긴 값이 현재 값과 같음 | 렌더를 예약하지 않습니다. |
-
-4,000행 중 한 행의 상태만 바꾸면 **0.22 ms**, 루트부터 다시 렌더하면 3.60 ms입니다. 약 16배 차이입니다.
+- **Why** — 한 곳이 바뀔 때 전체를 다시 호출하는 것이 v1에서 가장 큰 비용입니다.
+- **How** — `setState`가 자신의 Fiber와 조상의 `childLanes`에 lane을 표시합니다. 렌더는 표시된 경로만 복사하며 내려가고, 나머지는 이전 Fiber를 공유합니다.
+- **Result** — 4,000행 중 한 행을 바꾸면 컴포넌트 호출이 4,000 → **1회**, 시간이 3.60 → **0.22 ms**입니다.
 
 [Bailout](src/fiber/workLoop.ts) · [Child reconciler](src/fiber/childReconciler.ts) · [Hook queue](src/fiber/hooks.ts)
 
 ## Fewer Layers than React
 
-| Layer | React | Reactify |
-| --- | --- | --- |
-| Events | 루트에 위임하는 합성 이벤트 시스템 | 없습니다. 현재 이벤트 이름만 읽어 lane을 정합니다. |
-| Host attributes | 속성 종류별 전용 처리 | HTML 속성으로 정규화해 `setAttribute`로 씁니다. |
-| Features | Context, Suspense, ref, 포털, SVG, hydration 등 | HTML 요소와 함수 컴포넌트만 다룹니다. |
-| Hooks | 10종 이상 | `useState`, `useEffect`, `useMemo` |
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/layers-dark.png">
+  <img src="assets/layers-light.png" alt="event에서 lane, render, commit, DOM으로 이어지는 Reactify의 경로와, React에만 있는 Synthetic events, Context, Suspense, Ref, Portal, SVG, Hydration 계층">
+</picture>
 
-- **Size** — gzip **10.6 KB** (React 69.3 KB)
-- **Memory** — 마운트 후 행당 JS 힙 **742 B** (React 867 B)
-- **Fast paths** — Reverse keys 5.5배, Unmount list 2.9배, Update one row 12%
-- **Known gaps** — Initial render 8%, 4,000행을 모두 다시 그리는 경로는 25–37% 느립니다.
+- **Why** — React의 구조는 따르되, 이 과제에 쓰지 않는 계층은 크기와 실행 비용만 남깁니다.
+- **Removed** — Synthetic events, Context, Suspense, ref · portal, SVG · hydration, 속성 종류별 전용 처리.
+- **Result** — gzip **10.6 KB** (React 69.3 KB), 행당 JS 힙 **742 B** (867 B), 첫 렌더의 GC 비중 **6%** (14%). Reverse keys **5.5×**, Unmount list **2.9×**, Update one row **12%** faster.
+- **Known gaps** — Initial render는 8%, 4,000행을 모두 다시 그리는 경로는 25–37% 느립니다.
 
 ## API
 
