@@ -42,7 +42,7 @@ export function getCurrentPriorityLevel(): SchedulerPriority {
 }
 
 /** 같은 우선순위 안에서는 등록 순서가 만료 순서이므로 각 대기열의 맨 앞 작업만 비교한다. */
-function nextTask(): ScheduledTask | undefined {
+function getNextScheduledTask(): ScheduledTask | undefined {
   let next: ScheduledTask | undefined;
   for (const queue of priorityQueues) {
     const task = queue.values().next().value;
@@ -71,7 +71,7 @@ function postHostTask(): void {
 
 /** 하나의 호스트 태스크에서 작업 하나를 실행한다. 예외나 취소 뒤에도 다른 루트의 예약을 이어 간다. */
 function runHostTask(): void {
-  const task = nextTask();
+  const task = getNextScheduledTask();
   if (!task) {
     hostTaskScheduled = false;
     return;
@@ -80,18 +80,19 @@ function runHostTask(): void {
   const callback = task.callback;
   const start = performance.now();
   const deadline = start + sliceMs;
-  /** 호출한 작업이 취소됐거나 이번 실행에 배정된 시간이 지났는지 확인한다. */
-  const shouldYield = (): boolean => performance.now() >= deadline || !queue.has(task);
   task.callback = null;
   const previousPriority = currentPriority;
   try {
     currentPriority = task.priority;
-    const continuation = callback?.(shouldYield, task.expiresAt <= start);
+    // 취소됐거나 이번 실행에 배정된 시간을 넘기면 콜백이 브라우저에 양보할 수 있다.
+    const continuation = callback?.(function shouldYieldToHost() {
+      return performance.now() >= deadline || !queue.has(task);
+    }, task.expiresAt <= start);
     if (continuation && queue.has(task)) task.callback = continuation;
   } finally {
     currentPriority = previousPriority;
     if (!task.callback) queue.delete(task);
-    if (nextTask()) postHostTask();
+    if (getNextScheduledTask()) postHostTask();
     else hostTaskScheduled = false;
   }
 }
@@ -108,7 +109,7 @@ export function scheduleCallback(priority: SchedulerPriority, callback: Schedule
     postHostTask();
   }
   /** 대기 중인 작업과 아직 실행되지 않은 후속 콜백을 모두 취소한다. */
-  return function cancelTask(): void {
+  return function cancelScheduledTask(): void {
     task.callback = null;
     queue.delete(task);
   };

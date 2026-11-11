@@ -1,5 +1,5 @@
 import { getEventPriority } from '../dom/index.js';
-import { getHighestPriorityLane, IdleLane, laneForPriority, NoLane, type Lane, type Lanes, type RenderPriority } from './lanes.js';
+import { getHighestPriorityLane, IdleLane, getLaneForPriority, NoLane, type Lane, type Lanes, type RenderPriority } from './lanes.js';
 
 let inTransition = false;
 let currentPriority: RenderPriority | undefined;
@@ -65,9 +65,9 @@ export function runWithPassivePriority<T>(lanes: Lanes, scope: () => T): T {
 /** 렌더 중인 lane, 전환, 지정한 문맥, 현재 DOM 이벤트 순으로 이번 갱신의 lane을 고른다. */
 export function requestUpdateLane(view: Window | null): Lane {
   if (currentRenderLane !== NoLane) return currentRenderLane;
-  if (inTransition) return laneForPriority('transition');
-  if (currentPriority !== undefined) return laneForPriority(currentPriority);
+  if (inTransition) return getLaneForPriority('transition');
+  if (currentPriority !== undefined) return getLaneForPriority(currentPriority);
   // 다른 문서의 루트를 갱신할 때는 이벤트가 발생한 호출 측 창에만 현재 이벤트가 있을 수 있다.
   const currentEvent = view?.event ?? (typeof window === 'undefined' ? undefined : window.event);
-  return laneForPriority(currentEvent ? getEventPriority(currentEvent.type) : 'normal');
+  return getLaneForPriority(currentEvent ? getEventPriority(currentEvent.type) : 'normal');
 }

@@ -32,7 +32,7 @@ export interface ProcessedRootUpdates {
 }
 
 /** 주어진 초기 화면에서 시작하는 빈 HostRoot 업데이트 큐를 만든다. */
-export function createUpdateQueue(initial: ElementChild = null): RootUpdateQueue {
+export function createRootUpdateQueue(initial: ElementChild = null): RootUpdateQueue {
   return {
     baseState: initial, firstBaseUpdate: null, lastBaseUpdate: null,
     shared: { pending: null, pendingLanes: NoLanes },
@@ -40,7 +40,7 @@ export function createUpdateQueue(initial: ElementChild = null): RootUpdateQueue
 }
 
 /** 접수 순서를 지키며 새 요청을 공유 원형 목록 끝에 O(1)로 추가한다. */
-export function enqueueUpdate(queue: RootUpdateQueue, lane: Lane, children: ElementChild, requestId: number): void {
+export function enqueueRootUpdate(queue: RootUpdateQueue, lane: Lane, children: ElementChild, requestId: number): void {
   const update: RootUpdate = { requestId, lane, children, next: null };
   const tail = queue.shared.pending;
   if (tail === null) {
@@ -54,12 +54,12 @@ export function enqueueUpdate(queue: RootUpdateQueue, lane: Lane, children: Elem
 }
 
 /** 이번 렌더가 큐를 읽은 뒤 새로 접수된 lane도 커밋 시점에 확인한다. */
-export function getPendingLanes(queue: RootUpdateQueue): Lanes {
+export function getPendingRootLanes(queue: RootUpdateQueue): Lanes {
   return queue.shared.pendingLanes;
 }
 
 /** 새 요청을 current의 선형 목록에 붙여 작업 트리가 폐기돼도 다시 읽을 수 있게 한다. */
-function transferPending(queue: RootUpdateQueue): void {
+function transferPendingRootUpdates(queue: RootUpdateQueue): void {
   const tail = queue.shared.pending;
   if (tail === null) return;
   const head = tail.next!;
@@ -80,8 +80,8 @@ function appendBaseUpdate(queue: RootUpdateQueue, source: RootUpdate, lane: Lane
 }
 
 /** 이번 lane의 요청을 적용하고, 처음 건너뛴 위치부터 재적용할 작업 큐를 만든다. */
-export function processUpdateQueue(current: RootUpdateQueue, renderLanes: Lanes): ProcessedRootUpdates {
-  transferPending(current);
+export function processRootUpdateQueue(current: RootUpdateQueue, renderLanes: Lanes): ProcessedRootUpdates {
+  transferPendingRootUpdates(current);
   const queue: RootUpdateQueue = { ...current, firstBaseUpdate: null, lastBaseUpdate: null };
   let children = current.baseState;
   let remainingLanes = NoLanes;
@@ -103,8 +103,8 @@ export function processUpdateQueue(current: RootUpdateQueue, renderLanes: Lanes)
 }
 
 /** 실패하거나 취소한 미커밋 요청만 제거하고, 이미 커밋된 재적용 기록과 다른 lane은 유지한다. */
-export function discardUpdates(queue: RootUpdateQueue, ids: ReadonlySet<number>): Lanes {
-  transferPending(queue);
+export function discardRootUpdates(queue: RootUpdateQueue, ids: ReadonlySet<number>): Lanes {
+  transferPendingRootUpdates(queue);
   const first = queue.firstBaseUpdate;
   queue.firstBaseUpdate = null;
   queue.lastBaseUpdate = null;

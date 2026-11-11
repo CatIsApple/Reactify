@@ -1,5 +1,5 @@
 /** 컨테이너와 같은 문서나 섀도 루트에서 실제로 포커스를 받은 요소를 찾는다. */
-function focusedElement(container: Element): Element | null {
+function getFocusedElement(container: Element): Element | null {
   const root = container.getRootNode() as Document | ShadowRoot;
   let active = root.activeElement ?? container.ownerDocument.activeElement;
   while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
@@ -23,7 +23,7 @@ function captureSelection(element: HTMLElement): (() => void) | null {
     const { selectionStart: start, selectionEnd: end, selectionDirection: direction } = input;
     if (start === null || end === null) return null;
     // 입력 타입이 여전히 선택을 지원하고 브라우저가 범위를 바꿨을 때만 복원한다.
-    return () => {
+    return function restoreInputSelection() {
       if (input.selectionStart !== null &&
           (input.selectionStart !== start || input.selectionEnd !== end || input.selectionDirection !== direction)) {
         input.setSelectionRange(start, end, direction ?? undefined);
@@ -37,19 +37,19 @@ function captureSelection(element: HTMLElement): (() => void) | null {
   const { anchorNode, anchorOffset, focusNode, focusOffset } = selection;
   if (!anchorNode || !focusNode || !element.contains(anchorNode) || !element.contains(focusNode)) return null;
   // 이동 뒤에도 같은 텍스트 노드가 남아 있으면 사용자가 선택한 방향으로 양 끝점을 연결한다.
-  return () => {
+  return function restoreEditableSelection() {
     if (!element.contains(anchorNode) || !element.contains(focusNode)) return;
     if (selection.anchorNode === anchorNode && selection.anchorOffset === anchorOffset &&
         selection.focusNode === focusNode && selection.focusOffset === focusOffset) return;
     selection.setBaseAndExtent(
-      anchorNode, Math.min(anchorOffset, selectionLength(anchorNode)),
-      focusNode, Math.min(focusOffset, selectionLength(focusNode)),
+      anchorNode, Math.min(anchorOffset, getSelectionLength(anchorNode)),
+      focusNode, Math.min(focusOffset, getSelectionLength(focusNode)),
     );
   };
 }
 
 /** 선택 끝점의 최대 오프셋은 텍스트에서는 문자 수, 요소에서는 자식 노드 수다. */
-function selectionLength(node: Node): number {
+function getSelectionLength(node: Node): number {
   return node.nodeType === node.TEXT_NODE ? (node as Text).length : node.childNodes.length;
 }
 
@@ -57,18 +57,18 @@ function selectionLength(node: Node): number {
 export function captureFocus(container: Element): (() => void) | null {
   const doc = container.ownerDocument;
   if (!doc.defaultView) return null;
-  const active = focusedElement(container);
+  const active = getFocusedElement(container);
   if (!(active instanceof doc.defaultView.HTMLElement) || !containsFocus(container, active)) return null;
   const restoreSelection = captureSelection(active);
 
   // 이벤트 처리 중 다른 컨트롤에 포커스가 갔다면 그 선택을 유지한다.
-  return () => {
+  return function restoreContainerFocus() {
     if (!active.isConnected || !containsFocus(container, active)) return;
-    const current = focusedElement(container);
+    const current = getFocusedElement(container);
     if (current !== active) {
       if (current && current !== doc.body && current !== doc.documentElement) return;
       active.focus({ preventScroll: true });
-      if (focusedElement(container) !== active) return;
+      if (getFocusedElement(container) !== active) return;
     }
     restoreSelection?.();
   };

@@ -1,7 +1,7 @@
 import { scheduleCallback } from '../scheduler/index.js';
 import { ChildDeletion, Passive, PassiveMask } from './flags.js';
-import { nextInSubtree } from './fiberNode.js';
-import { getPassiveEffects, type PassiveEffect } from './hooks.js';
+import { getNextFiberInSubtree } from './fiberNode.js';
+import { iteratePassiveEffects, type PassiveEffect } from './hooks.js';
 import type { Lanes } from './lanes.js';
 import type { ChildFiber, Fiber, HostRootFiber } from './types.js';
 import { runWithPassivePriority } from './updatePriority.js';
@@ -23,10 +23,10 @@ let cancelTask: (() => void) | null = null;
 let flushing = false;
 
 /** 삭제된 가지 안의 모든 effect는 이전 의존성과 무관하게 부모부터 정리한다. */
-function collectDeletedEffects(deleted: ChildFiber, cleanups: PassiveEffect[]): void {
-  for (let fiber: ChildFiber | null = deleted; fiber !== null; fiber = nextInSubtree(fiber, deleted)) {
+function collectDeletedPassiveEffects(deleted: ChildFiber, cleanups: PassiveEffect[]): void {
+  for (let fiber: ChildFiber | null = deleted; fiber !== null; fiber = getNextFiberInSubtree(fiber, deleted)) {
     if (fiber.tag === 'function') {
-      for (const effect of getPassiveEffects(fiber, false)) cleanups.push(effect);
+      for (const effect of iteratePassiveEffects(fiber, false)) cleanups.push(effect);
     }
   }
 }
@@ -39,7 +39,7 @@ export function collectPassiveEffects(tree: HostRootFiber): PassiveBatch | null 
   while (fiber !== null) {
     if ((fiber.flags | fiber.subtreeFlags) & Passive) batch.flagged.push(fiber);
     if ((fiber.flags & ChildDeletion) && fiber.deletions !== null) {
-      for (const deleted of fiber.deletions) collectDeletedEffects(deleted, batch.cleanups);
+      for (const deleted of fiber.deletions) collectDeletedPassiveEffects(deleted, batch.cleanups);
     }
     if ((fiber.subtreeFlags & PassiveMask) && fiber.child !== null) {
       fiber = fiber.child;
@@ -47,7 +47,7 @@ export function collectPassiveEffects(tree: HostRootFiber): PassiveBatch | null 
     }
     while (fiber !== null) {
       if ((fiber.flags & Passive) && fiber.tag === 'function') {
-        for (const effect of getPassiveEffects(fiber, true)) {
+        for (const effect of iteratePassiveEffects(fiber, true)) {
           batch.cleanups.push(effect);
           batch.setups.push(effect);
         }
@@ -75,20 +75,20 @@ export function enqueuePassiveEffects(batch: PassiveBatch | null, lanes: Lanes):
 }
 
 /** 하나의 사용자 콜백에서 발생한 오류를 보고하고 같은 커밋의 나머지 effect 처리를 계속한다. */
-function reportEffectError(error: unknown): void {
+function reportPassiveEffectError(error: unknown): void {
   if (typeof globalThis.reportError === 'function') globalThis.reportError(error);
   else console.error(error);
 }
 
 /** 이전 cleanup을 먼저 모두 호출하고, 새 setup이 반환한 cleanup을 다음 커밋에 공유한다. */
-function runEffects(work: PassiveWork): void {
+function runPassiveEffects(work: PassiveWork): void {
   for (const effect of work.cleanups) {
     const cleanup = effect.instance.destroy;
     effect.instance.destroy = undefined;
     try {
       cleanup?.();
     } catch (error) {
-      reportEffectError(error);
+      reportPassiveEffectError(error);
     }
   }
   for (const { create, instance } of work.setups) {
@@ -99,7 +99,7 @@ function runEffects(work: PassiveWork): void {
         throw new TypeError('useEffect must return a cleanup function or undefined');
       }
     } catch (error) {
-      reportEffectError(error);
+      reportPassiveEffectError(error);
     }
   }
 }
@@ -112,7 +112,9 @@ export function flushPassiveEffects(): void {
   flushing = true;
   try {
     for (const work of pending) {
-      runWithPassivePriority(work.lanes, () => runEffects(work));
+      runWithPassivePriority(work.lanes, function flushPassiveEffectBatch() {
+        runPassiveEffects(work);
+      });
     }
   } finally {
     pending.length = 0;

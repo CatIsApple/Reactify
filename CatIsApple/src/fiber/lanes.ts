@@ -21,6 +21,11 @@ const SyncUpdateLanes = SyncLane | InputContinuousLane | DefaultLane;
 let nextTransitionLane = FirstTransitionLane;
 let currentEventTransitionLane = NoLane;
 
+/** 마이크로태스크에서 현재 이벤트의 전환 lane을 비워 다음 요청이 새 lane을 받도록 한다. */
+function resetEventTransitionLane(): void {
+  currentEventTransitionLane = NoLane;
+}
+
 /** 같은 이벤트의 전환에는 같은 비트를 배정하고, 다음 이벤트가 오면 열 개의 비트를 순환한다. */
 function requestTransitionLane(): Lane {
   if (currentEventTransitionLane === NoLane) {
@@ -28,13 +33,13 @@ function requestTransitionLane(): Lane {
     nextTransitionLane <<= 1;
     if ((nextTransitionLane & TransitionLanes) === NoLanes) nextTransitionLane = FirstTransitionLane;
     // 같은 호출 스택의 전환 요청을 모은 뒤 다음 마이크로태스크부터 새 lane을 배정한다.
-    queueMicrotask(() => { currentEventTransitionLane = NoLane; });
+    queueMicrotask(resetEventTransitionLane);
   }
   return currentEventTransitionLane;
 }
 
 /** 루트 API의 요청을 Fiber 갱신 큐에 남길 단일 lane으로 변환한다. */
-export function laneForPriority(priority: RenderPriority): Lane {
+export function getLaneForPriority(priority: RenderPriority): Lane {
   switch (priority) {
     case 'sync': return SyncLane;
     case 'user-blocking': return InputContinuousLane;
@@ -65,19 +70,19 @@ export function getNextLanes(pending: Lanes, wip: Lanes = NoLanes): Lanes {
 }
 
 /** 이번 렌더에 시작 후 양보 없이 처리할 입력·기본 갱신이 있는지 확인한다. */
-export function includesBlockingLane(lanes: Lanes): boolean {
+export function hasBlockingLane(lanes: Lanes): boolean {
   return (lanes & SyncUpdateLanes) !== NoLanes;
 }
 
 /** 루트가 해당 lane을 만료된 갱신으로 취급하기까지의 밀리초다. Idle 갱신은 만료되지 않는다. */
-export function laneTimeout(lane: Lane): number {
+export function getLaneTimeout(lane: Lane): number {
   if (lane === SyncLane || lane === InputContinuousLane) return 250;
   if (lane === DefaultLane || (lane & TransitionLanes) !== NoLanes) return 5000;
   return Infinity;
 }
 
 /** 루트의 비동기 콜백에 쓸 호스트 우선순위다. Sync 작업은 루트에서 마이크로태스크로 처리한다. */
-export function schedulerPriorityForLanes(lanes: Lanes): SchedulerPriority {
+export function getSchedulerPriorityForLanes(lanes: Lanes): SchedulerPriority {
   const lane = getHighestPriorityLane(lanes);
   if (lane === SyncLane || lane === InputContinuousLane) return 'user-blocking';
   if (lane === IdleLane) return 'idle';

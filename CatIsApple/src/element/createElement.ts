@@ -29,11 +29,13 @@ export function createElement(
   config: ElementConfig | null = null,
   ...children: ElementChild[]
 ): ReactifyElement {
-  const props = { ...config };
+  let props = { ...config };
   let key: string | null = null;
   if (Object.hasOwn(props, 'key')) {
-    key = props.key === undefined ? null : String(props.key);
-    delete props.key;
+    // 복사본에서 분리하므로 원본 getter 순서와 Symbol 속성을 유지하고 props에 delete를 쓰지 않는다.
+    const { key: rawKey, ...componentProps } = props;
+    key = rawKey === undefined ? null : String(rawKey);
+    props = componentProps;
   }
 
   if (children.length === 1) {

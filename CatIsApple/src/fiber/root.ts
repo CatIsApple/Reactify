@@ -7,7 +7,7 @@ import { RootScheduler } from './rootScheduler.js';
 import { collectPassiveEffects, enqueuePassiveEffects, flushPassiveEffects } from './passiveEffects.js';
 import type { FiberRoot, FiberRootInstance, FunctionFiber, HostRootFiber } from './types.js';
 import {
-  createUpdateQueue, discardUpdates, enqueueUpdate, getPendingLanes, processUpdateQueue,
+  createRootUpdateQueue, discardRootUpdates, enqueueRootUpdate, getPendingRootLanes, processRootUpdateQueue,
   type ProcessedRootUpdates,
 } from './updateQueue.js';
 import { createRenderWork, type RenderWork } from './workLoop.js';
@@ -28,7 +28,7 @@ function createHostRootFiber(root: FiberRootInstance): HostRootFiber {
   return {
     tag: 'root', type: null, key: null, stateNode: root, alternate: null, child: null, sibling: null, return: null,
     flags: NoFlags, subtreeFlags: NoFlags, deletions: null,
-    lanes: NoLanes, childLanes: NoLanes, memoizedState: null, updateQueue: createUpdateQueue(),
+    lanes: NoLanes, childLanes: NoLanes, memoizedState: null, updateQueue: createRootUpdateQueue(),
   };
 }
 
@@ -47,7 +47,7 @@ class ReactifyRoot implements FiberRootInstance {
   /** 현재 렌더가 양보하거나 수동 커밋을 기다릴 때 외부에서 들어온 Hook 요청이다. */
   private interleavedStateLanes: Lanes = NoLanes;
   private nextRequestId = 0;
-  private readonly scheduler = new RootScheduler(lanes => this.startScheduledRender(lanes));
+  private readonly scheduler = new RootScheduler(this.createScheduledRenderSlice.bind(this));
 
   /** 컨테이너를 연결하고 빈 HostRoot를 최초의 current로 지정한다. */
   constructor(readonly container: Element) {
@@ -62,7 +62,7 @@ class ReactifyRoot implements FiberRootInstance {
   get finishedWork(): HostRootFiber | null { return this.pending?.tree ?? null; }
 
   /** 같은 루트에서 동기 준비나 커밋이 중첩되는 것을 막는다. */
-  private assertIdle(): void {
+  private assertRootIsIdle(): void {
     if (this.busy) throw new Error('This FiberRoot is already rendering or committing');
   }
 
@@ -72,40 +72,40 @@ class ReactifyRoot implements FiberRootInstance {
     this.failedStateLanes &= ~lane;
     // 실패할 컴포넌트나 DOM 콜백이 매번 다른 setter를 호출해도 같은 오류를 자동으로 반복하지 않는다.
     if (!this.busy) this.interleavedStateLanes |= lane;
-    this.scheduler.request(lane);
+    this.scheduler.scheduleRootLane(lane);
   }
 
   /** 화면 큐와 커밋된 자손에 남은 lane을 합쳐 다음 작업을 예약한다. */
-  private finishScheduling(rootLanes: Lanes): void {
-    this.scheduler.finish(rootLanes | (this.current.childLanes & ~this.failedStateLanes));
+  private scheduleRemainingRootWork(rootLanes: Lanes): void {
+    this.scheduler.finishRootWork(rootLanes | (this.current.childLanes & ~this.failedStateLanes));
   }
 
   /** current와 작업 트리가 공유하는 원형 큐에 넣고 루트에 lane을 표시한다. */
-  private enqueue(children: ElementChild, lane: Lane): number {
+  private requestRootRender(children: ElementChild, lane: Lane): number {
     const id = ++this.nextRequestId;
-    enqueueUpdate(this.current.updateQueue, lane, children, id);
+    enqueueRootUpdate(this.current.updateQueue, lane, children, id);
     markUpdateLaneFromFiberToRoot(this.current, lane);
     this.failedStateLanes &= ~lane;
-    this.scheduler.request(lane);
+    this.scheduler.scheduleRootLane(lane);
     return id;
   }
 
   /** 수동 준비나 커밋 실패 후 보관하던 결과를 교체할 때, 해당 요청만 원본 큐에서 제거한다. */
-  private abandonPrepared(): void {
+  private discardPreparedRender(): void {
     if (this.pending === null) return;
     this.pending = null;
-    this.current.lanes = discardUpdates(this.current.updateQueue, new Set(this.discardOnAbandon));
+    this.current.lanes = discardRootUpdates(this.current.updateQueue, new Set(this.discardOnAbandon));
     this.discardOnAbandon = [];
   }
 
   /** 이번 lane의 큐 결과를 alternate에 기록하며 원래 큐는 렌더가 중단돼도 다시 읽을 수 있다. */
-  private startRender(lanes: Lanes): RootRender {
-    this.abandonPrepared();
+  private prepareRootRender(lanes: Lanes): RootRender {
+    this.discardPreparedRender();
     this.nestedRenderDepth = this.scheduledNestedRender ? this.nestedRenderDepth + 1 : 0;
     this.scheduledNestedRender = false;
     this.interleavedStateLanes = NoLanes;
     const current = this.current;
-    const updates = processUpdateQueue(current.updateQueue, lanes);
+    const updates = processRootUpdateQueue(current.updateQueue, lanes);
     const tree = current.alternate ?? createHostRootFiber(this);
     current.alternate = tree;
     tree.alternate = current;
@@ -117,25 +117,28 @@ class ReactifyRoot implements FiberRootInstance {
     tree.lanes = updates.remainingLanes;
     tree.childLanes = current.childLanes;
     tree.memoizedState = updates.children;
-    const work = createRenderWork(tree, updates.children, fiber => completeHostWork(fiber, this.container), lanes);
+    const root = this;
+    const work = createRenderWork(tree, updates.children, function completeHostFiberInContainer(fiber) {
+      completeHostWork(fiber, root.container);
+    }, lanes);
     return { lanes, tree, work, updates };
   }
 
   /** 수동 커밋 전에는 다른 콜백이 준비한 트리를 덮지 않도록 예약을 보류한다. */
   prepare(children: ElementChild): void {
-    this.assertIdle();
+    this.assertRootIsIdle();
     flushPassiveEffects();
-    this.abandonPrepared();
-    this.scheduler.pause();
-    const id = this.enqueue(children, SyncLane);
-    const render = this.startRender(SyncLane);
+    this.discardPreparedRender();
+    this.scheduler.pauseRootWork();
+    const id = this.requestRootRender(children, SyncLane);
+    const render = this.prepareRootRender(SyncLane);
     this.busy = true;
     try {
-      runWithRenderLanes(SyncLane, () => render.work.run());
+      runWithRenderLanes(SyncLane, render.work.performRenderWork);
       this.pending = render;
       this.discardOnAbandon = [id];
     } catch (error) {
-      this.fail(render);
+      this.handleRootRenderFailure(render);
       throw error;
     } finally {
       this.busy = false;
@@ -144,7 +147,7 @@ class ReactifyRoot implements FiberRootInstance {
 
   /** 표시된 DOM 변경이 성공하면 current를 교체하고 커밋 도중 접수된 요청까지 다시 예약한다. */
   commit(): void {
-    this.assertIdle();
+    this.assertRootIsIdle();
     if (this.pending === null) return;
     flushPassiveEffects();
     const render = this.pending;
@@ -153,17 +156,19 @@ class ReactifyRoot implements FiberRootInstance {
     try {
       // DOM 커밋이 deletions를 비우기 전에 정리할 Hook을 찾는다. 실패한 트리의 effect는 예약하지 않는다.
       const passive = collectPassiveEffects(render.tree);
-      render.work.withMountingHooks(() => {
-        runWithCommitPriority(() => commitMutationEffects(render.tree, render.work.reusedParents));
+      render.work.runWithMountingHooks(function commitRootAtSyncPriority() {
+        runWithCommitPriority(function applyRootMutationEffects() {
+          commitMutationEffects(render.tree, render.work.reusedParents);
+        });
       });
       const { remainingLanes, queue } = render.updates;
-      render.tree.lanes = remainingLanes | getPendingLanes(queue);
+      render.tree.lanes = remainingLanes | getPendingRootLanes(queue);
       this.current = render.tree;
-      render.work.commitHooks();
+      render.work.commitRenderHooks();
       this.firstCommit = false;
       this.pending = null;
       this.discardOnAbandon = [];
-      this.finishScheduling(render.tree.lanes);
+      this.scheduleRemainingRootWork(render.tree.lanes);
       enqueuePassiveEffects(passive, render.lanes);
     } finally {
       this.busy = false;
@@ -179,41 +184,45 @@ class ReactifyRoot implements FiberRootInstance {
     this.scheduledNestedRender = this.busy;
     const lane = requestUpdateLane(this.container.ownerDocument.defaultView);
     if (!this.busy && this.pending !== null) {
-      this.abandonPrepared();
-      this.finishScheduling(this.current.lanes);
+      this.discardPreparedRender();
+      this.scheduleRemainingRootWork(this.current.lanes);
     }
-    this.enqueue(children, lane);
+    this.requestRootRender(children, lane);
   }
 
   /** 실패한 요청을 분리하고 남은 작업을 예약한다. 커밋에 실패한 트리는 수동으로 재시도할 수 있다. */
-  private fail(render: RootRender): void {
+  private handleRootRenderFailure(render: RootRender): void {
     const { processedIds, remainingLanes, queue } = render.updates;
     // 실패한 화면 요청은 큐에서 버릴 수 있다. Hook만 실행한 경우에는 요청이 다시 올 때까지 그 lane을 보류한다.
     if (processedIds.length === 0) this.failedStateLanes |= render.lanes & ~this.interleavedStateLanes;
     if (this.pending === render) {
       this.discardOnAbandon = processedIds;
-      this.finishScheduling(remainingLanes | getPendingLanes(queue));
+      this.scheduleRemainingRootWork(remainingLanes | getPendingRootLanes(queue));
     } else {
-      this.current.lanes = discardUpdates(this.current.updateQueue, new Set(processedIds));
-      this.finishScheduling(this.current.lanes);
+      this.current.lanes = discardRootUpdates(this.current.updateQueue, new Set(processedIds));
+      this.scheduleRemainingRootWork(this.current.lanes);
     }
   }
 
   /** 루트 스케줄러가 고른 lane을 동일한 작업 위치에서 이어가고 전체 트리가 완성되면 커밋한다. */
-  private startScheduledRender(lanes: Lanes): (shouldYield?: () => boolean) => boolean {
-    const render = this.startRender(lanes);
-    return shouldYield => {
+  private createScheduledRenderSlice(lanes: Lanes): (shouldYield?: () => boolean) => boolean {
+    const render = this.prepareRootRender(lanes);
+    const root = this;
+    return function performScheduledRenderSlice(shouldYield) {
       try {
-        this.busy = true;
+        root.busy = true;
         try {
-          if (!runWithRenderLanes(lanes, () => render.work.run(shouldYield))) return false;
-          this.pending = render;
+          const completed = runWithRenderLanes(lanes, function performRenderWorkForLanes() {
+            return render.work.performRenderWork(shouldYield);
+          });
+          if (!completed) return false;
+          root.pending = render;
         } finally {
-          this.busy = false;
+          root.busy = false;
         }
-        this.commit();
+        root.commit();
       } catch (error) {
-        this.fail(render);
+        root.handleRootRenderFailure(render);
         if (typeof globalThis.reportError === 'function') globalThis.reportError(error);
         else console.error(error);
       }
