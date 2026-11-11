@@ -29,9 +29,6 @@ root.render(createElement('h1', { className: 'title' }, 'Reactify'));
 
 ![4,000행 목록의 일곱 가지 렌더 경로에서 Reactify와 React 19.3.1의 소요 시간을 비교한 막대 그래프](assets/bench-4000-rows.png)
 
-- 한 부분만 바뀌는 경로(Update one row)와 구조가 바뀌는 경로(Reverse keys, Unmount list)는 React보다 빠릅니다.
-- 4,000행을 모두 다시 계산하는 경로(Re-render, Update 4,000 texts · attributes)는 bailout이 적용되지 않아 React보다 느립니다.
-
 ### Flame Graph
 
 **Initial render**의 CPU 프로파일입니다. 위에서 아래로 호출 순서이고, 폭은 한 번의 렌더에서 차지한 시간입니다.
@@ -39,14 +36,14 @@ root.render(createElement('h1', { className: 'title' }, 'Reactify'));
 ![4,000행 첫 렌더의 CPU 프로파일을 Reactify와 React 19.3.1로 나란히 그린 flame 그래프](assets/flame-first-render.png)
 
 - **Browser DOM** — 절반 이상이며 두 라이브러리가 같습니다(53%, 54%).
-- **Garbage collection** — Reactify 6%, React 14%입니다.
-- **Framework JS** — Reactify 39%, React 29%입니다. 호스트 요소를 완료하는 단계(`completeHostElement`)가 더 깁니다.
+- **Garbage collection** — Reactify 6%, React 14%
+- **Framework JS** — Reactify 39%, React 29%
 
 **Re-render, same values**의 프로파일입니다. DOM 변경이 없어 대부분이 Framework JS입니다.
 
 ![4,000행을 같은 값으로 다시 렌더할 때의 CPU 프로파일을 Reactify와 React 19.3.1로 나란히 그린 flame 그래프](assets/flame-full-rerender.png)
 
-- **Complete phase** — Reactify 26%, React 4%입니다. Reactify는 요소마다 태그를 검증하고 직접 텍스트를 확인합니다.
+- **Complete phase** — Reactify 26%, React 4%
 - **Commit phase** — 비중이 비슷합니다(17%, 18%).
 
 ### Size, Memory, Scheduling
@@ -57,8 +54,6 @@ root.render(createElement('h1', { className: 'title' }, 'Reactify'));
 | JS heap per row · 마운트 후 | **742 B** | 867 B |
 | JS allocation · 전체 재렌더 1회 | 2.39 MB | **1.72 MB** |
 | Longest block · 10,000행 Transition 마운트 | 7.8 ms | 6.6 ms |
-
-Environment: Linux x64, Chrome 153 headless, 7세션의 중앙값, 소스 `9b85783953b8`.
 
 ## Documentation
 
