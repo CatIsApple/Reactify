@@ -11,7 +11,7 @@ export function setProp(el, key, value) {
     }
     if (value === false || value == null) return removeProp(el, key);
     // value, checked는 사용자가 조작한 뒤에는 attribute를 바꿔도 화면이 안 바뀌므로 DOM 프로퍼티로 설정한다
-    if (key === "value") el.value = value;
+    if (key === "value") { if (el.value !== String(value)) el.value = value; } // 같은 값을 다시 대입하면 입력 중 커서가 끝으로 튄다
     else if (key === "checked") el.checked = true; // attribute 형태(checked="")도 켜진 상태로 본다
     else el.setAttribute(key, value === true ? "" : String(value));
 }

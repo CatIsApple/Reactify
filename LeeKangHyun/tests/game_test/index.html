@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mini React - 카드 뒤집기 (DOM 동작 보기)</title>
+  <link rel="stylesheet" href="./game.css">
+</head>
+<body>
+  <div class="layout">
+    <section class="game-col">
+      <div class="toolbar">
+        <h1>카드 뒤집기</h1>
+        <button id="toggle-panel" type="button" aria-expanded="false" aria-controls="panel">DOM 보기</button>
+      </div>
+      <div id="game-root"></div>
+    </section>
+    <aside id="panel" hidden>
+      <h2>DOM 동작 보기</h2>
+      <div id="panel-body"></div>
+    </aside>
+  </div>
+  <script type="module" src="./game_main.js"></script>
+</body>
+</html>
