@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, test, expect } from "vitest";
 import { diff } from "../src/diff/diff.js";
-import { patch } from "../src/diff/patch.js";
+import { patch } from "../src/patch/patch.js";
 import { vnodeToDom } from "../src/vdom/vdom_create.js";
 
 const el = (type, props = {}, ...children) => ({ type, props, children });

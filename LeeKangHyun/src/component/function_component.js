@@ -1,6 +1,6 @@
 import { vnodeToDom } from "../vdom/vdom_create.js";
 import { diff } from "../diff/diff.js";
-import { patch } from "../diff/patch.js";
+import { patch } from "../patch/patch.js";
 import { setCurrentComponent } from "../hooks/current_component.js";
 
 const isVNode = (v) =>

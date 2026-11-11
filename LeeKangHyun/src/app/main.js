@@ -1,6 +1,6 @@
 import { domToVNode, vnodeToDom } from "../vdom/vdom_create.js";
 import { diff } from "../diff/diff.js";
-import { patch } from "../diff/patch.js";
+import { patch } from "../patch/patch.js";
 import { createHistory } from "../history/history.js";
 
 const realArea = document.getElementById("real-area");
