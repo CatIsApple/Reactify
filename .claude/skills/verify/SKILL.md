@@ -1,12 +1,12 @@
 ---
 name: verify
-description: 구현한 모듈의 테스트를 과제 요구사항 기준으로 작성·실행하고, 실패를 분류해 고치는 루프를 돈 뒤 결과를 보고한다. "/verify member-01/src/diff"처럼 담당 폴더를 지정한 검증 요청이나 대상이 확정된 모듈 작업에 사용.
+description: 대상의 현재 검증 환경을 확인하고, 테스트 작성·실행 범위에 맞춰 과제 요구사항을 검증한다. "/verify CatIsApple/src/element"처럼 담당 폴더를 지정한 검증 요청이나 대상이 확정된 모듈 작업에 사용.
 ---
 
 # 테스트 검증 워크플로
 
-인자로 **저장소 루트 기준 개인 폴더를 포함한 모듈 경로**를 받는다 (예: `/verify member-01/src/diff`).
-대상은 `member-01`, `member-02`, `member-03` 중 하나다. 인자나 이미 확정된 사용자 요청에서 개인을 알 수 없으면 먼저 묻는다. `git status`, 현재 브랜치, 다른 팀원의 변경만으로 대상을 추측하지 않는다. 대상이 확정된 뒤에만 해당 폴더의 변경을 참고한다.
+인자로 **저장소 루트 기준 개인 폴더를 포함한 모듈 경로**를 받는다 (예: `/verify CatIsApple/src/element`).
+대상 폴더는 `CatIsApple`, `member-02`, `member-03` 중 하나다. 김다온의 개인 브랜치는 `CatIsApple`, 커밋 scope는 `member-01`이다. 인자나 이미 확정된 사용자 요청에서 개인을 알 수 없으면 먼저 묻는다. `git status`, 현재 브랜치, 다른 팀원의 변경만으로 대상을 추측하지 않는다. 대상이 확정된 뒤에만 해당 폴더의 변경을 참고한다.
 
 이 공용 파일은 세 사람의 독립적인 전체 구현에 같은 검증 절차를 제공한다. 아래 체크리스트는 **Phase 1 중심**이며, Phase 2 테스트 기준이나 테스트 케이스가 이미 제공된 것은 아니다. Phase 2에서는 루트 컴포넌트만 State·Hook을 사용하고 자식은 props만 사용하는 과제 제약을 기준으로 별도 테스트를 작성한다. Fiber는 선택 확장이다.
 
@@ -18,6 +18,7 @@ description: 구현한 모듈의 테스트를 과제 요구사항 기준으로 �
 - 사람이 "테스트만"이라고 하면 구현 코드는 고치지 않는다.
 - 파일 읽기·쓰기, 구현 수정과 테스트 실행은 명시한 개인 폴더 안에서 수행한다. 다른 팀원의 코드·테스트·package와 공용 파일을 임의로 변경하지 않는다.
 - 구현이 없으면 확인할 수 없는 범위로 보고한다. 통과 수치를 만들기 위해 더미 테스트를 추가하지 않는다.
+- 현재 `CatIsApple/`는 사용자 요청으로 최소 Element 생성 함수만 유지하며 렌더러·State·Hooks·테스트·하네스·데모가 없다. 별도 작성·복원 요청이 없으면 아래 테스트 작성·실행 단계는 적용하지 않고, 현재 상태와 확인하지 못한 범위를 보고한다.
 
 ## 1. 파악
 
@@ -30,25 +31,25 @@ description: 구현한 모듈의 테스트를 과제 요구사항 기준으로 �
 
 ## 2. 테스트 작성
 
-- 위치: `<대상 개인>/tests/<모듈이름>.test.js` (예: `member-01/tests/diff.test.js`). 이미 있으면 덧붙인다.
+- 위치: `<대상 개인>/tests/<모듈이름>.test.js` (시작 하네스 예: `member-02/tests/diff.test.js`). 이미 있으면 덧붙인다.
 - 도구: `node:test`, `node:assert/strict`. 해당 개인의 `tests/setup.js`가 DOM 전역(`document` 등)을 만든다.
-- 검증 도구도 같은 개인의 `tests/helpers.js`에서 가져온다. `member-01/tests/diff.test.js`에서는 `import { canonical } from './helpers.js'`처럼 쓴다. 중첩된 테스트 파일은 그 파일 기준 상대 경로를 사용한다. 다른 개인의 helper를 가져오지 않는다.
+- 검증 도구도 같은 개인의 `tests/helpers.js`에서 가져온다. `member-02/tests/diff.test.js`에서는 `import { canonical } from './helpers.js'`처럼 쓴다. 중첩된 테스트 파일은 그 파일 기준 상대 경로를 사용한다. 다른 개인의 helper를 가져오지 않는다.
 - 체크리스트 항목 하나에 테스트 하나 이상. 테스트 이름에 항목 번호와 확인 내용을 한국어로 적는다.
   예: `test('D3 태그가 바뀌면 통째로 교체한다', …)`
 - 비슷한 케이스는 `cases` 배열 + `for` 루프로 묶는다.
 
 ## 3. 실행
 
-아래는 `member-01` 대상으로, 저장소 루트에서 시작하는 예시다. 번호는 확인한 개인으로 바꾼다. Node.js 22 이상과 해당 개인 폴더의 의존성이 필요하며 최초 설치는 `npm --prefix member-01 ci`다.
+아래는 시작 하네스를 유지한 `member-02` 대상으로, 저장소 루트에서 시작하는 예시다. 경로는 확인한 개인 폴더로 바꾼다. 현재 하네스가 없는 `CatIsApple/`에는 적용하지 않는다. Node.js 22 이상과 해당 개인 폴더의 의존성이 필요하며 최초 설치는 `npm --prefix member-02 ci`다.
 
 ```bash
-npm --prefix member-01 test                 # 해당 개인의 테스트 전체
+npm --prefix member-02 test                 # 해당 개인의 테스트 전체
 ```
 
 파일 하나를 실행할 때는 해당 개인 폴더로 이동한다.
 
 ```bash
-cd member-01
+cd member-02
 node --test --import ./tests/setup.js tests/diff.test.js
 ```
 
@@ -73,6 +74,8 @@ node --test --import ./tests/setup.js tests/diff.test.js
 ## 5. 보고
 
 다음 형식으로 끝낸다.
+
+테스트·하네스가 없으면 결과는 "테스트 환경 미제공 — 실행하지 않음"으로 적으며 통과 수치를 만들지 않는다.
 
 ```
 ## 검증 결과: <개인 폴더>/<모듈>
