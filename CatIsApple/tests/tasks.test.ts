@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { JSDOM } from 'jsdom';
+import { mountTasks } from '../dist/app/tasks.js';
+
+test('할 일 페이지에서 입력·추가·완료·삭제가 목록과 집계에 반영되고 문서 제목이 정리된다', () => {
+  const { window } = new JSDOM('<title>원래 제목</title><main></main>');
+  const container = window.document.querySelector('main')!;
+  const root = mountTasks(container);
+  const input = container.querySelector<HTMLInputElement>('#task-title')!;
+  const form = container.querySelector('form')!;
+  const summary = container.querySelector('.task-count')!;
+  const first = container.querySelector('li');
+  const total = container.querySelectorAll('li').length;
+  const completed = container.querySelectorAll('input[type=checkbox]:checked').length;
+  input.focus();
+  input.value = '테스트 작성';
+  input.dispatchEvent(new window.Event('input', { bubbles: true }));
+  form.requestSubmit();
+  assert.equal(input.value, '');
+  assert.equal(window.document.activeElement, input);
+  assert.equal(container.querySelector('li'), first);
+  assert.equal(container.querySelector('.task-count'), summary);
+  assert.equal(summary.textContent, `완료 ${completed}개 / 전체 ${total + 1}개`);
+  const item = Array.from(container.querySelectorAll('li')).find(row => row.textContent?.includes('테스트 작성'))!;
+  item.querySelector<HTMLInputElement>('[type=checkbox]')!.click();
+  assert.equal(summary.textContent, `완료 ${completed + 1}개 / 전체 ${total + 1}개`);
+  item.querySelector('button')!.click();
+  assert.equal(container.querySelectorAll('li').length, total);
+  assert.equal(summary.textContent, `완료 ${completed}개 / 전체 ${total}개`);
+  root.unmount();
+  assert.equal(window.document.title, '원래 제목');
+});

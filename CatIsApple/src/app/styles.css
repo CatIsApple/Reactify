@@ -1,0 +1,63 @@
+:root {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+  color: #202e32;
+  background: #f6f8f7;
+  line-height: 1.5;
+  --accent: #195d50;
+  --border: #cdd8d4;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.site-header { background: #fff; border-bottom: 1px solid var(--border); }
+.site-bar, main { width: min(100% - 40px, 1040px); margin-inline: auto; }
+.site-bar { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.brand, nav a { color: inherit; text-decoration: none; white-space: nowrap; }
+.brand { font-size: 23px; font-weight: 750; letter-spacing: -.05em; }
+.brand small { color: var(--accent); font-size: 13px; }
+nav { display: flex; gap: 16px; }
+nav a { font-size: 14px; padding: 6px 0; }
+nav a[aria-current] { color: var(--accent); font-weight: 700; border-bottom: 2px solid currentColor; }
+main { padding-block: clamp(25px, 5vw, 54px); }
+h1, h2, p { margin: 0; }
+h1 { font-size: clamp(30px, 4vw, 42px); line-height: 1.15; letter-spacing: -.06em; }
+.intro { color: #52645d; margin: 9px 0 25px; word-break: keep-all; }
+button, input, textarea { font: inherit; color: inherit; }
+button { border: 1px solid var(--border); background: #fff; border-radius: 7px; padding: 7px 13px; font-size: 14px; font-weight: 600; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { color: #708078; background: #edf1ef; cursor: default; }
+button:focus-visible, a:focus-visible, input:focus-visible, [contenteditable]:focus-visible, textarea:focus-visible { outline: 2px solid #267c6b; outline-offset: 2px; }
+.primary, .task-form button[type="submit"]:enabled { color: white; background: var(--accent); border-color: var(--accent); }
+.controls, .history-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.controls { justify-content: space-between; margin-bottom: 12px; }
+#history-position { color: #51645d; font-size: 13px; font-variant-numeric: tabular-nums; }
+.panes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.pane, .source, .task-app { min-width: 0; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+.pane h2, .source label { display: block; font-size: 15px; font-weight: 650; padding: 11px 16px; border-bottom: 1px solid var(--border); }
+.canvas { padding: 15px; min-height: 160px; overflow: auto; overflow-wrap: anywhere; }
+.canvas :first-child { margin-top: 0; }
+.canvas :last-child { margin-bottom: 0; }
+.canvas :where(img, input, select, textarea) { max-width: 100%; }
+.canvas h3 { font-size: 19px; margin-bottom: 6px; }
+.canvas ul { padding-left: 22px; }
+.source { margin-top: 16px; }
+.source textarea { width: 100%; vertical-align: top; min-height: 130px; resize: vertical; padding: 13px 16px; border: 0; border-radius: 0 0 10px 10px; background: #fdfefd; font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.tasks-page { max-width: 700px; }
+.task-app { padding: clamp(16px, 4vw, 28px); }
+.task-form label { display: block; margin-bottom: 7px; font-size: 14px; font-weight: 650; }
+.task-entry { display: flex; gap: 8px; }
+.task-entry input { flex: 1; min-width: 0; padding: 8px 11px; border: 1px solid var(--border); border-radius: 6px; }
+.task-count { margin: 20px 0 8px; font-size: 14px; color: #51645d; }
+.task-list { list-style: none; padding: 0; margin: 0; }
+.task-row { display: flex; gap: 10px; align-items: center; border-top: 1px solid #e3e9e7; padding: 10px 0; }
+.task-row label { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.task-row input { accent-color: var(--accent); }
+.task-row:has(:checked) .task-name { text-decoration: line-through; color: #64716b; }
+.task-remove { margin-inline-start: auto; font-size: 12px; }
+.task-empty { margin-top: 12px; color: #64716b; }
+@media (max-width: 650px) {
+  .site-bar, main { width: calc(100% - 24px); }
+  .panes { grid-template-columns: 1fr; }
+  .canvas { min-height: 95px; }
+  .controls, .history-controls { gap: 5px; }
+  button { padding-inline: 9px; }
+}
