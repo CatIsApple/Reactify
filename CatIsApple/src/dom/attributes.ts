@@ -27,6 +27,25 @@ function getHostAttributeValue(prop: string, name: string, value: unknown): stri
   throw new TypeError(`Unsupported HTML attribute value: ${prop}`);
 }
 
+/** 일반 호스트는 같은 속성이면 커밋을 생략한다. 접근자의 값은 커밋에서만 읽는다. */
+export function hasHostAttributeChanges(previous: object, next: object): boolean {
+  let matched = 0;
+  for (const prop in next) {
+    if (prop === 'children') continue;
+    const after = Object.getOwnPropertyDescriptor(next, prop);
+    if (after === undefined) continue;
+    const before = Object.getOwnPropertyDescriptor(previous, prop);
+    if (!before?.enumerable || 'get' in after || 'get' in before ||
+        after.value !== before.value) return true;
+    matched++;
+  }
+  // 새 속성이 모두 일치했다. 이전 속성이 하나라도 더 있으면 삭제가 필요하다.
+  for (const prop in previous) {
+    if (prop !== 'children' && Object.hasOwn(previous, prop) && --matched < 0) return true;
+  }
+  return false;
+}
+
 /** 첫 마운트에서는 원본 props의 속성을 문서 밖 DOM에 바로 설정한다. */
 export function setInitialHostAttributes(node: Element, props: object): void {
   for (const prop in props) {

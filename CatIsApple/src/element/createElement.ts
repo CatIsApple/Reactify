@@ -1,5 +1,21 @@
 import type { ElementChild, ElementType, ReactifyElement } from './types.js';
 
+/** 생성자가 받은 평범한 props 객체를 그대로 반환해 공개 필드와 프로토타입을 보존한다. */
+class PropsIdentity {
+  constructor(props: object) { return props; }
+}
+
+/** 팩토리의 HTML props에만 비공개 표식을 붙인다. Proxy도 트랩 실행 없이 판별한다. */
+export class FactoryHostProps extends PropsIdentity {
+  #owned = true;
+
+  /** 일반 객체 두 개만 비교한다. 상속 체인을 바꾼 props도 커밋 경로로 보낸다. */
+  static canCompare(previous: object, next: object): boolean {
+    return #owned in previous && #owned in next &&
+      Object.getPrototypeOf(previous) === Object.prototype && Object.getPrototypeOf(next) === Object.prototype;
+  }
+}
+
 /** createElement의 두 번째 인자. 일반 props와 함께 key와 기본 children을 받을 수 있다. */
 type ElementConfig = object & { key?: unknown; children?: ElementChild };
 
@@ -29,9 +45,9 @@ export function createElement(
   config: ElementConfig | null = null,
   ...children: ElementChild[]
 ): ReactifyElement {
-  let props = { ...config };
+  let props: ElementConfig = config === null ? {} : { ...config };
   let key: string | null = null;
-  if (Object.hasOwn(props, 'key')) {
+  if (config !== null && Object.hasOwn(props, 'key')) {
     // 복사본에서 분리하므로 원본 getter 순서와 Symbol 속성을 유지하고 props에 delete를 쓰지 않는다.
     const { key: rawKey, ...componentProps } = props;
     key = rawKey === undefined ? null : String(rawKey);
@@ -44,5 +60,6 @@ export function createElement(
     props.children = children;
   }
 
+  if (typeof type === 'string') new FactoryHostProps(props);
   return { type, key, props };
 }
