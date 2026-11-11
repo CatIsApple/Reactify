@@ -1,4 +1,5 @@
 import { vnodeToDom } from "../vdom/vdom_create.js";
+import { setProp, removeProp } from "../vdom/props.js";
 
 function find(root, path) { //어딜 바꿔야하는지 찾아주는 함수
     let node = root;
@@ -27,8 +28,8 @@ export function patch(rootDom, patches) {
         } else if (p.op === "TEXT") { //텍스트 바꾸기
             node.textContent = p.text;
         } else if (p.op === "PROPS") { //속성 바꾸기
-            for (const [k, v] of Object.entries(p.set)) node.setAttribute(k, v);
-            for (const k of p.remove) node.removeAttribute(k);
+            for (const [k, v] of Object.entries(p.set)) setProp(node, k, v);
+            for (const k of p.remove) removeProp(node, k);
         } else if (p.op === "REMOVE") { //지우기
             node.remove();
         } else {

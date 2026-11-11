@@ -1,3 +1,5 @@
+import { setProp } from "./props.js";
+
 export function domToVNode(node) {
     console.log("들어온 node:", node, "nodeType:", node.nodeType);
     if (node.nodeType === Node.TEXT_NODE) {
@@ -14,7 +16,7 @@ export function domToVNode(node) {
 export function vnodeToDom(vnode) {
     if (typeof vnode === "string") return document.createTextNode(vnode);
     const el = document.createElement(vnode.type);
-    for (const [k, v] of Object.entries(vnode.props)) el.setAttribute(k, v);
-    for (const c of vnode.children) el.appendChild(vnodeToDom(c));
+    for (const c of vnode.children) el.appendChild(vnodeToDom(c)); // <select value>가 먹히도록 자식을 먼저 붙인다
+    for (const [k, v] of Object.entries(vnode.props)) setProp(el, k, v);
     return el;
 }
