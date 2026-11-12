@@ -60,7 +60,7 @@ export function Stats({ remaining, total }) {
 
 // ---- 루트 컴포넌트: 모든 State와 Hook은 여기서만 쓴다 ----
 
-export function App() {
+export function App() { //역할 : 상태를 저장하고, 상태를 바꾸는 함수를 반환한다. (React의 useState와 동일)
     const [todos, setTodos] = useState([]);
     const [text, setText] = useState("");
     const [filter, setFilter] = useState("all");
