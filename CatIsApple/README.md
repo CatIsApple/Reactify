@@ -6,7 +6,7 @@
 
 ### React의 Fiber 구조를 그대로, 필요한 것만 남긴 UI 프레임워크
 
-**바뀐 곳만 다시 계산하고, 급한 갱신부터 처리하고, 비교가 끝난 변경만 DOM에 씁니다.**
+**계산은 최소한으로, 처리는 급한 것부터, 반영은 딱 한 번만.**
 
 ![100% TypeScript](https://img.shields.io/badge/100%25-TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Browser](https://img.shields.io/badge/runtime-Browser_·_ES_Modules-555)
