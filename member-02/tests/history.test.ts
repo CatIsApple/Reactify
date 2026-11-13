@@ -1,0 +1,41 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { StateHistory } from '../src/lab/history.ts';
+import { h } from '../src/core/index.ts';
+const tree = (value: string) => h('p', {}, value);
+test('history captures immutable snapshots and returns defensive clones', () => {
+  const initial = tree('a');
+  const history = new StateHistory(initial);
+  initial.children[0].props.nodeValue = 'changed';
+  assert.equal(history.current.children[0].props.nodeValue, 'a');
+  const read = history.current;
+  read.children[0].props.nodeValue = 'bad';
+  assert.equal(history.current.children[0].props.nodeValue, 'a');
+});
+test('undo, redo and branching discard only future history', () => {
+  const history = new StateHistory(tree('a'));
+  history.push(tree('b'));
+  history.push(tree('c'));
+  history.undo();
+  assert.equal(history.canRedo, true);
+  assert.equal(history.current.children[0].props.nodeValue, 'b');
+  history.push(tree('d'));
+  assert.equal(history.canRedo, false);
+  assert.equal(history.entries.length, 3);
+  history.undo();
+  history.redo();
+  assert.equal(history.current.children[0].props.nodeValue, 'd');
+});
+test('history no-op, limits, boundary undo and validation', () => {
+  const history = new StateHistory(tree('a'), 2);
+  assert.equal(history.push(tree('a')), false);
+  history.undo();
+  assert.equal(history.index, 0);
+  history.push(tree('b'));
+  history.push(tree('c'));
+  assert.equal(history.entries.length, 2);
+  history.redo();
+  assert.equal(history.index, 1);
+  assert.throws(() => history.go(4), RangeError);
+  assert.throws(() => new StateHistory(tree('a'), 0), RangeError);
+});

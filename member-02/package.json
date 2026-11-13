@@ -1,15 +1,33 @@
 {
-  "name": "mini-react-member-02",
+  "name": "mini-react-fiber-lab",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": {
-    "node": ">=22"
-  },
+  "description": "Vanilla TypeScript Virtual DOM, Diff/Patch, Fiber and root-only Hooks lab",
   "scripts": {
-    "test": "node --test --import ./tests/setup.js \"tests/**/*.test.js\"",
-    "dev": "npx --yes http-server -c-1 -p 5173 ."
+    "dev": "vite",
+    "start": "vite",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && vite build",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:coverage": "node --import tsx --experimental-test-coverage --test tests/*.test.ts",
+    "test:e2e": "playwright test",
+    "check": "npm test && npm run build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "engines": {
+    "node": ">=22.12.0"
   },
   "devDependencies": {
-    "jsdom": "^25.0.1"
+    "@playwright/test": "^1.56.1",
+    "@types/jsdom": "^27.0.0",
+    "@types/node": "^24.19.2",
+    "jsdom": "^27.1.0",
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6"
   }
 }
