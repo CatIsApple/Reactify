@@ -126,7 +126,7 @@ const [name,  setName ] = useState("a"); // hooks[1]
 | 카드 게임 · 패널 | `tests/game_test/game.test.js` | 17 |
 | **합계** | | **101** |
 
-- 현재 환경에 Vitest가 설치되어 있지 않아, `describe`/`test`/`expect`를 흉내 내는 임시 러너로 위 101개가 모두 통과하는 것을 확인했습니다. Vitest로는 아직 실행하지 못했고, `npm test`는 `vitest` import 때문에 실패합니다.
+- 이 폴더에서 `npm ci` 후 `npm test`를 실행하면 Vitest와 jsdom으로 10개 파일의 테스트 101개를 실행합니다.
 - jsdom 검증은 실제 브라우저의 reflow/repaint를 대신하지 않아서, 화면 기능은 브라우저에서도 직접 확인했습니다.
 
 ## 5. 한계와 다음 단계
@@ -247,5 +247,5 @@ AI 검증을 요청할 때는 저장소 루트 기준 `/verify LeeKangHyun/src/d
 - README 상단에 결과물, 핵심 설계, 문제 해결 기록, 테스트 현황을 정리하고 작업 기록의 시각을 git 커밋 시간 기준으로 바로잡음. 빠져 있던 patch · History · FunctionComponent · useState 기록을 채움.
 
 ### 검증 메모
-- 실행한 검증: Vitest가 설치되어 있지 않아 임시 러너(`describe`/`test`/`expect`를 흉내 내는 스크립트)로 전체 테스트 파일(101개)을 실행해 모두 통과를 확인. Vitest로는 실행하지 못했고, `npm test`는 `vitest` import 때문에 실패함.
+- 2026-11-13에 `npm ci` 후 `npm test`로 101개 통과, 실패 0개를 확인했습니다.
 - 알려진 제한: diff는 key 없이 index로 비교, 핸들러는 렌더마다 새 함수라 `PROPS` 패치가 매번 생김, batching 없음, effect는 동기 실행.
