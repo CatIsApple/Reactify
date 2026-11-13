@@ -1,0 +1,40 @@
+import { vnodeToDom } from "../vdom/vdom_create.js";
+import { setProp, removeProp } from "../vdom/props.js";
+
+function find(root, path) { //어딜 바꿔야하는지 찾아주는 함수
+    let node = root;
+    for (const i of path) {
+        node = node.childNodes[i];
+        if (!node) throw new Error(`patch: path [${path}] 에 해당하는 노드가 없습니다`); //만약 path가 잘못되었다면 에러를 던진다.
+    }
+    return node;
+}
+
+// diff가 만든 patches를 rootDom(path [])에 순서대로 적용한다. 루트가 교체될 수 있으므로 새 루트를 반환한다.
+export function patch(rootDom, patches) {
+    let root = rootDom;
+    for (const p of patches) {
+        if (p.op === "CREATE") {
+            const parent = find(root, p.path.slice(0, -1));
+            if (parent.childNodes.length !== p.path.at(-1)) throw new Error(`patch: CREATE 위치 [${p.path}] 가 DOM과 맞지 않습니다`);
+            parent.appendChild(vnodeToDom(p.vnode));
+            continue;
+        }
+        const node = find(root, p.path);
+        if (p.op === "REPLACE") { //태그 바꾸기
+            const next = vnodeToDom(p.vnode);
+            node.replaceWith(next);
+            if (node === root) root = next;
+        } else if (p.op === "TEXT") { //텍스트 바꾸기
+            node.textContent = p.text;
+        } else if (p.op === "PROPS") { //속성 바꾸기
+            for (const [k, v] of Object.entries(p.set)) setProp(node, k, v);
+            for (const k of p.remove) removeProp(node, k);
+        } else if (p.op === "REMOVE") { //지우기
+            node.remove();
+        } else {
+            throw new Error(`patch: 알 수 없는 op ${p.op}`);
+        }
+    }
+    return root;
+}

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mini React - Todo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; }
+    .form { display: flex; gap: .5rem; }
+    .form input { flex: 1; padding: .4rem; }
+    .filters { margin: .75rem 0; display: flex; gap: .4rem; }
+    .filters .active { font-weight: bold; background: #222; color: #fff; }
+    ul { padding: 0; list-style: none; }
+    li { display: flex; align-items: center; gap: .5rem; padding: .3rem 0; }
+    li span { flex: 1; }
+    li.done span { text-decoration: line-through; color: #888; }
+    .empty, .clock { color: #666; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="./todo_main.js"></script>
+</body>
+</html>
