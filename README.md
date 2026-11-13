@@ -1,6 +1,6 @@
 <div align="center">
 
-![Reactify](../assets/reactify-banner.png)
+![Reactify](./assets/reactify-banner.png)
 
 # Reactify
 
