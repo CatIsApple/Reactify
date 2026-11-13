@@ -183,11 +183,20 @@ export function shutdown(server, store) {
 }
 
 function main() {
-    const port = Number(process.env.PORT ?? 3000);
+    // 기본 포트 6380: 3000번대는 VS Code Live Preview 같은 개발 도구가 자주 쓰고, 6379(실제 Redis)와도 겹치지 않게 비켜 둔다
+    const port = Number(process.env.PORT ?? 6380);
     const store = new Store();
     store.startSweeper(1000);
     const server = createApp(store, { logger: ({ method, path, status, ms, error }) => console.log(`${method} ${path} ${status} ${ms}ms`, error ?? "") });
-    server.listen(port, () => console.log(`mini-redis listening on http://localhost:${port}`));
+    // 인증이 없는 서버이므로 기본은 이 컴퓨터에서만 접속되는 127.0.0.1에 연다 (외부 인터페이스에 노출하지 않기 위해)
+    const host = process.env.HOST ?? "127.0.0.1";
+    server.once("error", (err) => {
+        if (err.code !== "EADDRINUSE") throw err;
+        // 스택 트레이스 대신 원인과 해결 방법을 알려 준다
+        console.error(`포트 ${port}이 이미 사용 중입니다. PORT 환경변수로 다른 포트를 지정하세요 (예: PORT=${port + 1} npm start)`);
+        process.exit(1);
+    });
+    server.listen(port, host, () => console.log(`mini-redis listening on http://${host}:${port}`));
 
     let closing = false;
     const stop = (signal) => {

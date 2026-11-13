@@ -1,0 +1,5 @@
+# 생성되는 파일: npm run seed:db 와 npm run bench 가 만든다
+demo/data/*.db
+demo/data/*.db-*
+bench/results/*.json
+bench/results/*.md

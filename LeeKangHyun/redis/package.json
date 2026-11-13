@@ -2,6 +2,10 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
+    "seed": "node demo/seed_users.js",
+    "seed:db": "node demo/seed_db.js",
+    "demo": "node demo/server.js",
+    "bench": "node bench/benchmark.js",
     "test": "node --test"
   }
 }

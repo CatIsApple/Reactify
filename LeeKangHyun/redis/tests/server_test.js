@@ -137,7 +137,7 @@ test("값 종류: 문자열, 숫자, 객체, 배열, null", () =>
 
 test("인코딩된 특수 키: %2F, 한글, 공백, 예약 문자", () =>
     withApp(async ({ base, store }) => {
-        const keys = ["a/b", "한글 키", "with space", "q?x=1&y=2", "100%", "__proto__", "..", "a#b"];
+        const keys = ["a/b", "한글 키", "with space", "q?x=1&y=2", "100%", "__proto__", "a#b"];
         for (const key of keys) {
             const path = `/keys/${encodeURIComponent(key)}`;
             assert.equal((await call(base, "PUT", path, { value: key })).status, 201, key);
@@ -145,6 +145,22 @@ test("인코딩된 특수 키: %2F, 한글, 공백, 예약 문자", () =>
             assert.equal((await call(base, "GET", path)).json.value, key);
         }
         assert.equal((await call(base, "GET", "/stats")).json.size, keys.length);
+    }));
+
+test('키 ".."도 경로 정규화로 사라지지 않고 키로 저장된다 (fetch는 ".."를 미리 정규화하므로 원시 요청으로 보낸다)', () =>
+    withApp(async ({ base, store }) => {
+        const send = (method, body) =>
+            new Promise((resolve, reject) => {
+                const req = http.request(`${base}/keys/..`, { method, headers: { "Content-Type": "application/json" }, path: "/keys/.." }, (res) => {
+                    res.resume();
+                    resolve(res.statusCode);
+                });
+                req.on("error", reject);
+                req.end(body);
+            });
+        assert.equal(await send("PUT", '{"value":"dots"}'), 201);
+        assert.equal(store.get(".."), "dots");
+        assert.equal(await send("GET"), 200);
     }));
 
 test("잘못된 입력은 400: 잘못된 JSON, 객체가 아닌 본문, value 누락", () =>
@@ -283,6 +299,7 @@ test("예상치 못한 예외는 500 { error: 'internal error' }이고 내부 �
             throw new Error("secret internal detail /home/user/app.js");
         },
         ttl: () => -2,
+        stopSweeper() {}, // shutdown이 호출하므로 필요하다
     };
     await withApp(
         async ({ base }) => {
