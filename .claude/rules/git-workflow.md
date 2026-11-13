@@ -4,7 +4,8 @@
 
 ## 1. 대상과 요청 범위 확인
 
-- 개인 작업은 사용자 요청이나 이미 확정된 맥락의 `member-01`, `member-02`, `member-03`을 따릅니다. 대상이 불분명하면 묻고, 현재 브랜치나 변경 파일만으로 담당자를 추측하지 않습니다.
+- 개인 작업은 사용자 요청이나 이미 확정된 맥락의 `CatIsApple`, `member-02`, `member-03`을 따릅니다. 대상이 불분명하면 묻고, 현재 브랜치나 변경 파일만으로 담당자를 추측하지 않습니다.
+- 김다온은 `CatIsApple/` 폴더와 `CatIsApple` 개인 브랜치에서 작업하며, 커밋 scope는 `member-01`을 유지합니다. 다른 개인의 폴더 매핑은 [CONTRIBUTING.md](../../CONTRIBUTING.md)를 따릅니다.
 - 공용 문서·설정 변경이 명시적으로 요청되었다면 `shared` 범위로 진행합니다. 개인 번호를 불필요하게 다시 묻지 않습니다.
 - `커밋해줘`는 로컬 커밋까지입니다. `업로드해줘`·`PR 만들어줘`는 작업 브랜치 push와 PR 생성·갱신까지 포함합니다. 이미 승인된 범위는 재확인하지 않습니다.
 - push나 PR 요청에서 `main` 병합 권한까지 추론하지 않습니다. 리뷰어는 사용자가 지정한 계정만 요청 대상으로 삼고, 신원을 임의로 정하거나 협업자를 초대하지 않습니다.
@@ -31,20 +32,20 @@ git fetch origin
 
 ## 3. 브랜치 선택과 최신 변경 반영
 
-기본은 영구 개인 브랜치 `member-01`, `member-02`, `member-03`입니다. 아래는 **대상이 member-01로 확인된 경우의 예시**입니다. 다른 개인에게 그대로 적용하지 않습니다.
+기본은 영구 개인 브랜치 `CatIsApple`, `member-02`, `member-03`입니다. 아래는 **대상이 CatIsApple로 확인된 경우의 예시**입니다. 다른 개인에게 그대로 적용하지 않습니다.
 
 처음 가져올 때만 실행합니다. 이미 로컬 브랜치가 있으면 다음 블록을 사용합니다.
 
 ```sh
-git switch --track origin/member-01
+git switch --track origin/CatIsApple
 git merge origin/main
 ```
 
 기존 개인 브랜치에서 새 작업을 시작할 때 실행합니다. 먼저 위 fetch를 완료합니다.
 
 ```sh
-git switch member-01
-git merge --ff-only origin/member-01
+git switch CatIsApple
+git merge --ff-only origin/CatIsApple
 git merge origin/main
 ```
 
@@ -54,18 +55,18 @@ git merge origin/main
 
 | 범위 | 이름 예시 |
 | --- | --- |
-| 개인 작업 | `feat/member-01/vdom`, `fix/member-02/history`, `test/member-03/hooks` |
-| 개인 문서 | `docs/member-01/usage` |
+| 개인 작업 | `feat/CatIsApple/vdom`, `fix/member-02/history`, `test/member-03/hooks` |
+| 개인 문서 | `docs/CatIsApple/usage` |
 | 공용 문서·설정 | `docs/shared/git-workflow`, `chore/shared/tooling` |
 
-예를 들어 공용 Git 문서 작업을 승인받았다면 `git switch --no-track -c docs/shared/git-workflow origin/main`을 사용합니다. 임시 브랜치의 upstream을 `origin/main`으로 설정하지 않으며, push 시 작업 브랜치로 지정합니다. 이미 그 이름의 브랜치가 있으면 내용을 확인하여 이어갑니다. `member-01/topic`은 기존 `member-01` 참조와 충돌하므로 만들지 않습니다. 모든 작업 PR의 대상은 `main`입니다.
+예를 들어 공용 Git 문서 작업을 승인받았다면 `git switch --no-track -c docs/shared/git-workflow origin/main`을 사용합니다. 임시 브랜치의 upstream을 `origin/main`으로 설정하지 않으며, push 시 작업 브랜치로 지정합니다. 이미 그 이름의 브랜치가 있으면 내용을 확인하여 이어갑니다. `CatIsApple/topic`은 `CatIsApple` 참조와 충돌하므로 만들지 않습니다. 모든 작업 PR의 대상은 `main`입니다.
 
 ## 4. 검증하고 커밋하기
 
 - 커밋 하나에 논리적 변경 하나를 담습니다. 형식은 `type(scope): 설명`입니다.
 - type: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`. scope: `member-01`, `member-02`, `member-03`, `shared`.
 - 예: `feat(member-01): DOM을 VNode로 변환`, `docs(shared): AI Git 작업 절차 추가`. 설명 언어는 기존 저장소 스타일에 맞춰 한국어 또는 영어로 일관되게 사용합니다.
-- 변경에 맞는 실제 검증을 수행합니다. 개인 코드라면 해당 개인의 테스트를 실행하고 명령·결과를 기록합니다. 예: `npm --prefix member-01 test`.
+- 변경에 맞는 실제 검증을 수행합니다. 테스트가 있는 개인 코드는 해당 테스트를 실행하고 명령·결과를 기록합니다. 하네스 예: `npm --prefix member-02 test`. 현재 `CatIsApple/`에는 테스트·test 스크립트가 없으므로 그 상태와 실제 수행한 검증만 보고하며, 별도 요청 없이 하네스를 복원하지 않습니다.
 - tests 0 / pass 0은 테스트 케이스가 없다는 뜻이며 기능 검증 통과가 아닙니다. 더미 테스트나 조작한 기대값으로 통과를 만들지 않습니다.
 - 문서만 변경했다면 링크·경로·명령의 일관성과 diff를 확인합니다. 실행하지 않은 앱 테스트를 실행했다고 적지 않습니다.
 - 이번 작업의 **정확한 파일 경로**만 `git add -- <파일 경로>`로 스테이징합니다. 같은 파일에 다른 변경이 섞였다면 필요한 부분만 분리하고, 이미 스테이징된 사용자 변경을 임의로 해제하지 않습니다.
@@ -74,11 +75,11 @@ git merge origin/main
 
 ## 5. push와 PR 생성·갱신
 
-업로드가 요청된 경우에만 진행합니다. 다음은 `member-01` 브랜치 예시이며 실제 작업 브랜치로 바꿉니다. `main`을 head로 사용하지 않습니다.
+업로드가 요청된 경우에만 진행합니다. 다음은 `CatIsApple` 브랜치 예시이며 실제 작업 브랜치로 바꿉니다. `main`을 head로 사용하지 않습니다.
 
 ```sh
-git push -u origin member-01
-gh pr list --repo CatIsApple/Reactify --head member-01 --base main --state open
+git push -u origin CatIsApple
+gh pr list --repo CatIsApple/Reactify --head CatIsApple --base main --state open
 ```
 
 - 같은 head·base의 열린 PR이 있으면 새 PR을 만들지 않고 기존 PR을 갱신합니다. 최종 변경 범위에 맞춰 제목·본문도 수정합니다.
@@ -86,7 +87,7 @@ gh pr list --repo CatIsApple/Reactify --head member-01 --base main --state open
 - 아래 `<실제 제목>`, `<본문 파일 경로>`, `<기존 PR 번호>`는 확인한 값으로 바꾸는 자리표시자입니다. 본문 파일을 먼저 작성하고 해당 분기 하나만 실행합니다.
 
 ```sh
-gh pr create --repo CatIsApple/Reactify --base main --head member-01 --title "<실제 제목>" --body-file "<본문 파일 경로>"
+gh pr create --repo CatIsApple/Reactify --base main --head CatIsApple --title "<실제 제목>" --body-file "<본문 파일 경로>"
 ```
 
 기존 PR을 갱신할 때는 다음 명령을 사용합니다.
@@ -113,10 +114,10 @@ gh pr edit "<기존 PR 번호>" --repo CatIsApple/Reactify --title "<실제 제�
 
 ```sh
 git fetch origin
-git switch member-01
-git merge --ff-only origin/member-01
+git switch CatIsApple
+git merge --ff-only origin/CatIsApple
 git merge origin/main
-git push origin member-01
+git push origin CatIsApple
 ```
 
 위 예시에도 깨끗한 작업 트리와 실제 대상 확인이 필요합니다. 분기·충돌은 앞의 merge 절차로 처리하며 reset이나 강제 push로 맞추지 않습니다.
@@ -127,6 +128,6 @@ git push origin member-01
 
 ## 요청 예시
 
-- “member-01의 VNode 변경을 확인하고 관련 테스트를 실행한 뒤 `feat(member-01)` 커밋만 만들어줘. 업로드는 하지 마.”
+- “CatIsApple 폴더의 VNode 변경을 현재 환경에서 검증하고 `feat(member-01)` 커밋만 만들어줘. 업로드는 하지 마.”
 - “member-02의 history 수정을 개인 브랜치에서 검증하고 push한 뒤 main 대상 PR을 만들어줘. 열린 PR이 있으면 갱신하고 병합은 하지 마.”
 - “공용 Git 작업 문서를 수정하고 `docs/shared/git-workflow` 브랜치에서 커밋·push·PR까지 만들어줘. 개인 구현 폴더는 변경하지 마.”
